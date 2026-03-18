@@ -63,13 +63,24 @@ export default function Home() {
             <h1 className="text-4xl font-extrabold text-foreground tracking-tight">
               LeadFlow <span className="text-primary">Explorer</span>
             </h1>
-            <p className="text-muted-foreground mt-1">Busque leads qualificados em segundos.</p>
+            <p className="text-muted-foreground mt-1">Busque leads qualificados em segundos via Google Maps.</p>
           </div>
-          {isSignedIn && (
-            <div className="flex items-center gap-3 bg-white p-2 rounded-full shadow-sm border px-4">
-              <span className="text-sm font-medium">Olá, {user.firstName}</span>
-            </div>
-          )}
+          <div className="flex items-center gap-4">
+            {!isSignedIn ? (
+              <button 
+                onClick={() => window.location.href = '/sign-in'}
+                className="flex items-center gap-2 bg-white border border-gray-300 rounded-full px-6 py-2 shadow-sm hover:shadow-md transition-all text-sm font-semibold"
+              >
+                <img src="https://www.google.com/favicon.ico" className="w-4 h-4" alt="Google" />
+                Conectar com Google
+              </button>
+            ) : (
+              <div className="flex items-center gap-3 bg-primary/5 p-2 rounded-full border border-primary/20 px-4">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <span className="text-sm font-medium text-primary">Logado: {user.firstName}</span>
+              </div>
+            )}
+          </div>
         </header>
 
         <section>
