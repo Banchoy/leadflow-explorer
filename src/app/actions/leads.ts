@@ -66,30 +66,23 @@ export async function getLeadsBySearch(query: string, location: string) {
     return [];
   }
 
-  try {
-    // Modelos para tentar em sequência caso dê 404
-    const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro"];
-    const apiVersions = ["v1beta", "v1"];
+  const prompt = `
+    CONTEXTO: Robô de Prospecção de Elite (Billionaire Shadow Mode).
+    OBJETIVO: Extrair leads da busca por "${query}" em "${location}".
     
-    let lastError = "";
-    console.log(`[Gemini] Validando chave API (Início: ${apiKey.substring(0, 7)}...)`);
+    INSTRUÇÕES:
+    1. Leia o HTML e extraia até 15 empresas.
+    2. Foque em: Nome, Endereço, Website, Telefone/WhatsApp (FORMATO: +55...) e Instagram.
+    3. Retorne APENAS o array JSON, sem texto explicativo.
 
-    const prompt = `
-      CONTEXTO: Robô de Prospecção de Elite (Billionaire Shadow Mode).
-      OBJETIVO: Extrair leads da busca por "${query}" em "${location}".
-      
-      INSTRUÇÕES:
-      1. Leia o HTML e extraia até 15 empresas.
-      2. Foque em: Nome, Endereço, Website, Telefone/WhatsApp (FORMATO: +55...) e Instagram.
-      3. Retorne APENAS o array JSON, sem texto explicativo.
+    JSON FORMAT:
+    [{"companyName": "...", "address": "...", "website": "...", "phone": "...", "instagram": "...", "status": "Pendente"}]
+    
+    HTML DA BUSCA:
+    ${rawHtml.substring(0, 25000)}
+  `;
 
-      JSON FORMAT:
-      [{"companyName": "...", "address": "...", "website": "...", "phone": "...", "instagram": "...", "status": "Pendente"}]
-      
-      HTML DA BUSCA:
-      ${rawHtml.substring(0, 25000)}
-    `;
-
+  try {
     const cleanKey = apiKey.trim();
     console.log(`[Gemini] Diagnóstico: Validando chave ${cleanKey.substring(0, 7)}...`);
 
@@ -142,7 +135,6 @@ export async function getLeadsBySearch(query: string, location: string) {
   const $ = cheerio.load(rawHtml);
   const manualLeads: any[] = [];
   
-  // Padrões comuns de resultados de busca (Bing/DuckDuckGo)
   $('.result, .b_algo, .g').each((i: number, el: any) => {
     if (i >= 15) return;
     const name = $(el).find('h2, .result__title, h3').first().text().trim();
