@@ -39,19 +39,20 @@ export async function getLeadsBySearch(query: string, location: string) {
     } as any);
 
     const prompt = `
-      Encontre uma lista de até 15 empresas (leads) para o nicho "${query}" na localização "${location}" no Brasil.
-      Para cada empresa, retorne:
-      1. Nome da empresa
-      2. Endereço completo
-      3. Telefone (se disponível, priorizando celular/WhatsApp)
-      4. Website (se disponível)
+      Aja como um especialista em prospecção B2B. Sua tarefa é encontrar leads reais e atualizados.
+      USE A BUSCA DO GOOGLE (Search) para encontrar empresas do nicho "${query}" na região "${location}".
+      
+      Importante:
+      - Foque em empresas que apareceriam no Google Maps/Meu Negócio.
+      - Extraia Nome, Endereço Completo e TELEFONE (preferencialmente celular/WhatsApp).
+      - Retorne no máximo 15 resultados.
 
-      Retorne APENAS um array JSON válido no seguinte formato, sem explicações:
+      FORMATO OBRIGATÓRIO (retorne APENAS o JSON, sem explicações):
       [
         {
-          "id": "gerar um id único aqui",
-          "companyName": "Nome",
-          "address": "Endereço",
+          "id": "string-unica",
+          "companyName": "Nome da Empresa",
+          "address": "Endereço Completo",
           "website": "URL ou null",
           "phone": "Telefone ou null",
           "status": "Pendente"
@@ -59,21 +60,26 @@ export async function getLeadsBySearch(query: string, location: string) {
       ]
     `;
 
+    console.log(`Iniciando busca Gemini para: ${query} em ${location}`);
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
+    console.log("Resposta bruta do Gemini:", responseText);
     
-    // Clean JSON response (Markdown blocks)
-    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      console.error("Gemini failed to return valid JSON:", responseText);
+    // Clean JSON response (look for the first [ and the last ])
+    const firstBracket = responseText.indexOf('[');
+    const lastBracket = responseText.lastIndexOf(']');
+    
+    if (firstBracket === -1 || lastBracket === -1) {
+      console.error("Gemini não retornou um formato JSON válido.");
       return [];
     }
 
-    const leads = JSON.parse(jsonMatch[0]);
+    const jsonString = responseText.substring(firstBracket, lastBracket + 1);
+    const leads = JSON.parse(jsonString);
+    console.log(`Sucesso! Encontrados ${leads.length} leads.`);
     return leads;
-  } catch (error) {
-    console.error("Gemini search failed:", error);
-    // Silent return to avoid UI crash, error state handled in Home
+  } catch (error: any) {
+    console.error("Falha na busca do Gemini:", error.message || error);
     return [];
   }
 }

@@ -27,7 +27,7 @@ export default function Home() {
     try {
       const results = await getLeadsBySearch(query, location);
       if (results.length === 0) {
-        setError("Nenhum lead encontrado. Verifique se o nicho e a localização estão corretos ou se sua chave de API do Google tem permissões para 'Places API (New)'.");
+        setError("Nenhum lead encontrado. Tente ajustar o nicho ou a localização, ou verifique se sua chave do Gemini está correta nas configurações.");
       }
       setLeads(results);
     } catch (error: any) {
