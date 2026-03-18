@@ -70,23 +70,23 @@ export async function getLeadsBySearch(query: string, location: string) {
     const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
     
     const prompt = `
-      Aja como um Robô de Prospecção (Billionaire Shadow). 
-      Analise o HTML abaixo resultante de uma busca por "${query}" em "${location}".
+      CONTEXTO: Robô de Prospecção de Elite (Billionaire Shadow Mode).
+      OBJETIVO: Extrair exatamente os leads da busca por "${query}" em "${location}".
       
-      Extraia até 15 leads contendo:
-      - Nome da Empresa
-      - Endereço (se houver)
-      - Telefone/WhatsApp (FORMATO: +55...)
-      - Website
-      - Link do INSTAGRAM (Procure por links instagram.com)
+      INSTRUÇÕES:
+      1. Leia o HTML e extraia até 15 empresas.
+      2. Foque em: Nome, Endereço, Website, Telefone/WhatsApp (FORMATO: +55...) e Instagram.
+      3. Se o telefone não estiver explícito, procure padrões como (XX) 9XXXX-XXXX.
+      4. Retorne APENAS o array JSON, sem texto explicativo.
 
-      Retorne APENAS um array JSON:
+      JSON FORMAT:
       [{"companyName": "...", "address": "...", "website": "...", "phone": "...", "instagram": "...", "status": "Pendente"}]
       
-      HTML:
-      ${rawHtml.substring(0, 8000)}
+      HTML DA BUSCA:
+      ${rawHtml.substring(0, 25000)}
     `;
 
+    console.log(`[Gemini] Enviando ${prompt.length} caracteres para análise...`);
     const response = await fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -96,16 +96,25 @@ export async function getLeadsBySearch(query: string, location: string) {
     });
 
     const data = await response.json();
+    if (data.error) {
+      console.error("[Gemini Error Body]", JSON.stringify(data.error));
+      return [];
+    }
+
     const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    console.log(`[Gemini Response] Bruto: ${responseText.substring(0, 300)}...`);
     
     const jsonMatch = responseText.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
       const leads = JSON.parse(jsonMatch[0]);
+      console.log(`[Billionaire Shadow] ${leads.length} leads extraídos com sucesso!`);
       return leads.map((l: any) => ({
         ...l,
         id: crypto.randomUUID(),
         status: 'Pendente' as const
       }));
+    } else {
+      console.warn("[Gemini] Não foi possível encontrar um array JSON na resposta.");
     }
   } catch (error: any) {
     console.error("[Billionaire Shadow Error]", error.message || error);
