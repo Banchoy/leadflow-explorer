@@ -74,6 +74,22 @@ export async function getLeadsBySearch(query: string, location: string) {
     let lastError = "";
     console.log(`[Gemini] Validando chave API (Início: ${apiKey.substring(0, 7)}...)`);
 
+    const prompt = `
+      CONTEXTO: Robô de Prospecção de Elite (Billionaire Shadow Mode).
+      OBJETIVO: Extrair leads da busca por "${query}" em "${location}".
+      
+      INSTRUÇÕES:
+      1. Leia o HTML e extraia até 15 empresas.
+      2. Foque em: Nome, Endereço, Website, Telefone/WhatsApp (FORMATO: +55...) e Instagram.
+      3. Retorne APENAS o array JSON, sem texto explicativo.
+
+      JSON FORMAT:
+      [{"companyName": "...", "address": "...", "website": "...", "phone": "...", "instagram": "...", "status": "Pendente"}]
+      
+      HTML DA BUSCA:
+      ${rawHtml.substring(0, 25000)}
+    `;
+
     for (const apiVer of apiVersions) {
       for (const modelName of modelsToTry) {
         try {
