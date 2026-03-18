@@ -39,21 +39,21 @@ export async function getLeadsBySearch(query: string, location: string) {
       contents: [{
         role: "user",
         parts: [{
-          text: `Aja como um especialista em prospecção (Billionaire Shadow Mode).
-          USE A FERRAMENTA DE BUSCA DO GOOGLE integrada para encontrar leads reais de "${query}" em "${location}".
-          Extraia Nome, Endereço Completo, Telefone (WhatsApp) e Website.
-          
-          Retorne APENAS um array JSON válido:
+          text: `Aja como um prospecção agressiva (Billionaire Shadow Edition).
+          ENCONTRE LEADS REAIS para o nicho "${query}" em "${location}" no Brasil.
+          Extraia Nome da Empresa, Endereço, Telefone e Website.
+          Use sua ferramenta de busca integrada para garantir dados reais.
+
+          Retorne APENAS um array JSON:
           [{"id": "uuid", "companyName": "...", "address": "...", "website": "...", "phone": "...", "status": "Pendente"}]
           `
         }]
       }],
       tools: [{
-        // @ts-ignore - Standard Gemini Search tool name
-        google_search_retrieval: {
-          dynamic_retrieval_config: {
+        googleSearchRetrieval: {
+          dynamicRetrievalConfig: {
             mode: "MODE_DYNAMIC",
-            dynamic_threshold: 0.1
+            dynamicThreshold: 0.1
           }
         }
       }]
