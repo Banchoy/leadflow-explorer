@@ -5,6 +5,8 @@ import { SearchForm } from "@/components/search-form";
 import { ResultsTable } from "@/components/results-table";
 import { getLeadsBySearch, updateLeadStatus } from "./actions/leads";
 import { useUser, SignInButton } from "@clerk/nextjs";
+import { TrendingUp, Search, MapPin } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export interface Lead {
   id: string;
@@ -33,7 +35,7 @@ export default function Home() {
     } catch (error) {
       console.error("Search failed:", error);
     } finally {
-      setIsSearching(false);
+      setIsLoading(false);
     }
   }
 
@@ -90,6 +92,7 @@ export default function Home() {
           </div>
         </header>
 
+        <section className="mb-12 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
           <SearchForm onSearch={handleSearch} isLoading={isLoading} />
         </section>
 
@@ -99,18 +102,14 @@ export default function Home() {
           </div>
         )}
 
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
-              Resultados da Busca
-              {leads.length > 0 && (
-                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                  {leads.length} encontrados
-                </span>
-              )}
+          <div className="flex items-center justify-between mb-6 px-4">
+            <h2 className="text-sm font-black text-slate-100 uppercase tracking-widest flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              Resultados de Inteligência
             </h2>
+            <p className="text-[10px] font-bold text-slate-500">{leads.length} OPORTUNIDADES IDENTIFICADAS</p>
           </div>
-          <ResultsTable leads={leads} onContact={handleContact} />
+          <ResultsTable leads={leads} onUpdateStatus={handleUpdateStatus} />
         </section>
       </div>
     </main>
