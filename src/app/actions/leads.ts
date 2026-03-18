@@ -67,55 +67,52 @@ export async function getLeadsBySearch(query: string, location: string) {
   }
 
   try {
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    // Modelos para tentar em sequência caso dê 404
+    const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro"];
+    const apiVersions = ["v1beta", "v1"];
     
-    const prompt = `
-      CONTEXTO: Robô de Prospecção de Elite (Billionaire Shadow Mode).
-      OBJETIVO: Extrair exatamente os leads da busca por "${query}" em "${location}".
-      
-      INSTRUÇÕES:
-      1. Leia o HTML e extraia até 15 empresas.
-      2. Foque em: Nome, Endereço, Website, Telefone/WhatsApp (FORMATO: +55...) e Instagram.
-      3. Se o telefone não estiver explícito, procure padrões como (XX) 9XXXX-XXXX.
-      4. Retorne APENAS o array JSON, sem texto explicativo.
+    let lastError = "";
+    console.log(`[Gemini] Validando chave API (Início: ${apiKey.substring(0, 7)}...)`);
 
-      JSON FORMAT:
-      [{"companyName": "...", "address": "...", "website": "...", "phone": "...", "instagram": "...", "status": "Pendente"}]
-      
-      HTML DA BUSCA:
-      ${rawHtml.substring(0, 25000)}
-    `;
+    for (const apiVer of apiVersions) {
+      for (const modelName of modelsToTry) {
+        try {
+          const geminiUrl = `https://generativelanguage.googleapis.com/${apiVer}/models/${modelName}:generateContent?key=${apiKey}`;
+          
+          console.log(`[Gemini] Tentando: ${apiVer}/${modelName}...`);
+          
+          const response = await fetch(geminiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }]
+            })
+          });
 
-    console.log(`[Gemini] Enviando ${prompt.length} caracteres para análise...`);
-    const response = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
-      })
-    });
-
-    const data = await response.json();
-    if (data.error) {
-      console.error("[Gemini Error Body]", JSON.stringify(data.error));
-      return [];
+          const data = await response.json();
+          
+          if (response.ok && !data.error) {
+            const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+            const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+              const leads = JSON.parse(jsonMatch[0]);
+              console.log(`[Gemini] Sucesso com ${modelName}! ${leads.length} leads extraídos.`);
+              return leads.map((l: any) => ({
+                ...l,
+                id: crypto.randomUUID(),
+                status: 'Pendente' as const
+              }));
+            }
+          } else {
+            lastError = data.error?.message || `Status ${response.status}`;
+            if (response.status !== 404) break; // Se não for 404, o erro é outro (ex: quota), não adianta mudar modelo
+          }
+        } catch (e: any) {
+          lastError = e.message;
+        }
+      }
     }
-
-    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    console.log(`[Gemini Response] Bruto: ${responseText.substring(0, 300)}...`);
-    
-    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-    if (jsonMatch) {
-      const leads = JSON.parse(jsonMatch[0]);
-      console.log(`[Billionaire Shadow] ${leads.length} leads extraídos com sucesso!`);
-      return leads.map((l: any) => ({
-        ...l,
-        id: crypto.randomUUID(),
-        status: 'Pendente' as const
-      }));
-    } else {
-      console.warn("[Gemini] Não foi possível encontrar um array JSON na resposta.");
-    }
+    console.error("[Gemini] Todas as tentativas de modelo falharam:", lastError);
   } catch (error: any) {
     console.error("[Billionaire Shadow Error]", error.message || error);
   }
