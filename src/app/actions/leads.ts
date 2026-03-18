@@ -48,13 +48,26 @@ async function fetchSearchAlternative(query: string, location: string) {
   return "";
 }
 
+export interface Lead {
+  id: string;
+  companyName: string;
+  address?: string;
+  phone?: string;
+  website?: string;
+  email?: string;
+  instagram?: string;
+  status: 'Pendente' | 'Contatado' | 'Qualificado' | 'Desqualificado';
+  priority?: "Alta" | "Média" | "Baixa";
+}
+
 export async function getLeadsBySearch(query: string, location: string) {
   const apiKey = process.env.GOOGLE_AI_STUDIO_KEY || process.env.GOOGLE_PLACES_API_KEY;
   
   if (!apiKey || apiKey === 'your-api-key') {
     return [{
       id: crypto.randomUUID(), companyName: "Billionaire Example", address: "São Paulo, SP",
-      website: "https://example.com", phone: "11-99999-9999", status: "Pendente" as const,
+      website: "https://example.com", phone: "11-99999-9999", instagram: "https://instagram.com/exemplo",
+      status: "Pendente" as const, priority: "Alta" as const
     }];
   }
 
@@ -72,11 +85,13 @@ export async function getLeadsBySearch(query: string, location: string) {
     
     INSTRUÇÕES:
     1. Leia o HTML e extraia até 15 empresas.
-    2. Foque em: Nome, Endereço, Website, Telefone/WhatsApp (FORMATO: +55...) e Instagram.
-    3. Retorne APENAS o array JSON, sem texto explicativo.
+    2. Foque em: Nome, Endereço, Website, Telefone/WhatsApp (FORMATO: +55...), Email e Instagram.
+    3. Se o WhatsApp não estiver claro, extraia o telefone fixo ou celular padrão.
+    4. Extraia o link do Instagram se disponível (ex: instagram.com/usuario).
+    5. Retorne APENAS o array JSON, sem texto explicativo.
 
     JSON FORMAT:
-    [{"companyName": "...", "address": "...", "website": "...", "phone": "...", "instagram": "...", "status": "Pendente"}]
+    [{"companyName": "...", "address": "...", "website": "...", "phone": "...", "email": "...", "instagram": "...", "status": "Pendente"}]
     
     HTML DA BUSCA:
     ${rawHtml.substring(0, 25000)}
@@ -147,9 +162,11 @@ export async function getLeadsBySearch(query: string, location: string) {
         companyName: name,
         address: snippet.substring(0, 100) + "...",
         website: link,
-        phone: snippet.match(/(\d{2})?\s?9?\d{4}-?\d{4}/)?.[0] || "Consultar no site",
+        phone: snippet.match(/(\d{2})?\s?9?\d{4}-?\d{4}/)?.[0] || "Consultar",
+        email: snippet.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)?.[0] || null,
         instagram: snippet.includes("instagram.com") ? "Ver no site" : null,
-        status: 'Pendente' as const
+        status: 'Pendente' as const,
+        priority: "Média" as const
       });
     }
   });

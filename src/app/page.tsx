@@ -6,14 +6,16 @@ import { ResultsTable } from "@/components/results-table";
 import { getLeadsBySearch, updateLeadStatus } from "./actions/leads";
 import { useUser, SignInButton } from "@clerk/nextjs";
 
-interface Lead {
+export interface Lead {
   id: string;
   companyName: string;
-  address: string | null;
-  website: string | null;
-  phone: string | null;
-  instagram?: string | null;
-  status: 'Pendente' | 'Contatado';
+  address?: string;
+  phone?: string;
+  website?: string;
+  email?: string;
+  instagram?: string;
+  status: 'Pendente' | 'Contatado' | 'Qualificado' | 'Desqualificado';
+  priority?: "Alta" | "Média" | "Baixa";
 }
 
 export default function Home() {
@@ -27,65 +29,67 @@ export default function Home() {
     setError(null);
     try {
       const results = await getLeadsBySearch(query, location);
-      if (results.length === 0) {
-        setError("Nenhum lead encontrado. Tente ajustar o nicho ou a localização, ou verifique se sua chave do Gemini está correta nas configurações.");
-      }
       setLeads(results);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Search failed:", error);
-      setError(`Erro na busca: ${error.message || "Erro desconhecido"}. Verifique os logs da Vercel para mais detalhes.`);
     } finally {
-      setIsLoading(false);
+      setIsSearching(false);
     }
-  };
+  }
 
-  const handleContact = (lead: Lead) => {
-    if (!lead.phone) return;
-    
-    const message = encodeURIComponent("Olá, bom dia!");
-    const whatsappUrl = `https://wa.me/${lead.phone.replace(/\D/g, '')}?text=${message}`;
-    
-    window.open(whatsappUrl, "_blank");
-    
-    // Optimistic update
-    setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'Contatado' } : l));
-    
-    // In a real app, we would update the DB here
-    // updateLeadStatus(lead.id, 'Contatado');
-  };
-
-  if (!isLoaded) return null;
+  async function handleUpdateStatus(id: string, status: Lead['status']) {
+    setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l));
+    await updateLeadStatus(id, status);
+  }
 
   return (
-    <main className="min-h-screen bg-background p-4 md:p-8 lg:p-12">
-      <div className="max-w-6xl mx-auto space-y-8">
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-4xl font-extrabold text-foreground tracking-tight">
-              LeadFlow <span className="text-primary">Explorer</span>
-            </h1>
-            <p className="text-muted-foreground mt-1">Busque leads qualificados em segundos via Google Maps.</p>
-          </div>
+    <main className="min-h-screen bg-[#020617] text-slate-100 selection:bg-emerald-500/30">
+      {/* Mesh Gradient Background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-20">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-violet-600 blur-[120px] rounded-full" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-600 blur-[120px] rounded-full" />
+      </div>
+
+      <div className="relative z-10 container mx-auto px-4 py-8 max-w-6xl">
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12 animate-in fade-in slide-in-from-top-4 duration-1000">
           <div className="flex items-center gap-4">
-            {!isSignedIn ? (
-              <SignInButton mode="modal">
-                <button 
-                  className="flex items-center gap-2 bg-white border border-gray-300 rounded-full px-6 py-2 shadow-sm hover:shadow-md transition-all text-sm font-semibold"
-                >
-                  <img src="https://www.google.com/favicon.ico" className="w-4 h-4" alt="Google" />
-                  Conectar com Google
-                </button>
-              </SignInButton>
-            ) : (
-              <div className="flex items-center gap-3 bg-primary/5 p-2 rounded-full border border-primary/20 px-4">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-sm font-medium text-primary">Logado: {user.firstName}</span>
+            <div className="h-14 w-14 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(16,185,129,0.4)] transform hover:rotate-6 transition-transform">
+              <TrendingUp className="h-8 w-8 text-slate-950" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-black tracking-tighter uppercase italic">
+                LeadFlow <span className="text-emerald-400">Explorer</span>
+              </h1>
+              <p className="text-slate-500 text-xs font-bold tracking-[0.2em] uppercase">Billionaire Shadow Edition</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 bg-slate-900/40 p-1.5 rounded-2xl border border-slate-800 backdrop-blur-sm">
+            {isLoaded && !isSignedIn ? (
+              <div className="flex items-center gap-4 px-3">
+                <span className="text-xs font-bold text-slate-500 uppercase">Acesso Restrito</span>
+                <SignInButton mode="modal">
+                  <Button className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase px-6 rounded-xl transition-all">
+                    Conectar Google
+                  </Button>
+                </SignInButton>
               </div>
+            ) : isSignedIn ? (
+              <div className="flex items-center gap-3 px-3">
+                <div className="text-right">
+                  <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest leading-none mb-1">PRO PLAN</p>
+                  <p className="text-xs font-bold text-slate-200">{user?.firstName || "Usuário"}</p>
+                </div>
+                <div className="h-9 w-9 rounded-full border-2 border-emerald-500/50 p-0.5">
+                  <img src={user?.imageUrl} className="h-full w-full rounded-full object-cover" alt="User" />
+                </div>
+              </div>
+            ) : (
+              <div className="h-8 w-32 animate-pulse bg-slate-800 rounded-xl" />
             )}
           </div>
         </header>
 
-        <section>
           <SearchForm onSearch={handleSearch} isLoading={isLoading} />
         </section>
 

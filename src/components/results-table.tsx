@@ -1,95 +1,144 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, ExternalLink, MapPin } from "lucide-react";
-
-interface Lead {
-  id: string;
-  companyName: string;
-  address: string | null;
-  website: string | null;
-  phone: string | null;
-  instagram?: string | null;
-  status: 'Pendente' | 'Contatado';
-}
+import { MessageSquare, ExternalLink, MapPin, CheckCircle2, XCircle, Mail, Instagram, TrendingUp } from "lucide-react";
+import { Lead } from "@/app/page";
 
 interface ResultsTableProps {
   leads: Lead[];
-  onContact: (lead: Lead) => void;
+  onUpdateStatus: (id: string, status: Lead['status']) => void;
 }
 
-export function ResultsTable({ leads, onContact }: ResultsTableProps) {
+export function ResultsTable({ leads, onUpdateStatus }: ResultsTableProps) {
+  const handleWhatsApp = (phone: string) => {
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (!cleanPhone) return;
+    const message = encodeURIComponent("Olá! Vi seu perfil e gostaria de conversar sobre seus serviços.");
+    // Tenta abrir direto no Web se estiver no desktop, ou app se mobile
+    window.open(`https://web.whatsapp.com/send?phone=${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}&text=${message}`, '_blank');
+  };
+
   return (
-    <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/50 backdrop-blur-xl shadow-2xl overflow-hidden">
       <Table>
-        <TableHeader className="bg-muted/50">
-          <TableRow>
-            <TableHead className="font-bold">Empresa</TableHead>
-            <TableHead className="font-bold">Localização</TableHead>
-            <TableHead className="font-bold">Status</TableHead>
-            <TableHead className="text-right font-bold">Ações</TableHead>
+        <TableHeader className="bg-slate-900/80 border-b border-slate-800">
+          <TableRow className="hover:bg-transparent border-slate-800">
+            <TableHead className="text-slate-300 font-semibold py-4">Lead / Canais</TableHead>
+            <TableHead className="text-slate-300 font-semibold">Localização</TableHead>
+            <TableHead className="text-slate-300 font-semibold text-center">Qualificação</TableHead>
+            <TableHead className="text-slate-300 font-semibold text-right pr-6">Ações Premium</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {leads.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
-                Nenhum lead encontrado. Comece uma nova busca acima.
+            <TableRow className="hover:bg-transparent">
+              <TableCell colSpan={4} className="h-48 text-center">
+                <div className="flex flex-col items-center gap-2 text-slate-500">
+                  <TrendingUp className="h-8 w-8 opacity-20" />
+                  <p className="text-sm font-medium">Billionaire Shadow aguardando ordens...</p>
+                  <p className="text-xs opacity-60">Inicie uma busca para listar oportunidades.</p>
+                </div>
               </TableCell>
             </TableRow>
           ) : (
             leads.map((lead) => (
-              <TableRow key={lead.id} className="hover:bg-muted/30 transition-colors">
-                <TableCell className="font-medium">
-                  <div className="flex flex-col gap-1">
-                    <span>{lead.companyName}</span>
-                    <div className="flex flex-wrap gap-2">
+              <TableRow key={lead.id} className="group border-slate-800/50 hover:bg-slate-800/30 transition-all duration-300">
+                <TableCell>
+                  <div className="flex flex-col gap-1.5 py-1">
+                    <span className="font-bold text-slate-100 group-hover:text-emerald-400 transition-colors uppercase tracking-tight text-sm">
+                      {lead.companyName}
+                    </span>
+                    <div className="flex flex-wrap gap-2 items-center">
                       {lead.website && (
                         <a 
                           href={lead.website} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="text-[10px] bg-primary/5 text-primary px-1.5 py-0.5 rounded flex items-center gap-1 hover:bg-primary/10 transition-colors"
+                          className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-all border border-slate-700/50"
+                          title="Website"
                         >
-                          Site <ExternalLink className="h-2 w-2" />
+                          <ExternalLink className="h-3 w-3" />
                         </a>
                       )}
                       {lead.instagram && (
                         <a 
-                          href={lead.instagram.startsWith('http') ? lead.instagram : `https://instagram.com/${lead.instagram.replace('@', '')}`}
+                          href={lead.instagram.includes('instagram.com') ? lead.instagram : `https://instagram.com/${lead.instagram.replace('@', '')}`}
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="text-[10px] bg-pink-50 text-pink-600 px-1.5 py-0.5 rounded flex items-center gap-1 hover:bg-pink-100 transition-colors border border-pink-100"
+                          className="p-1.5 rounded-lg bg-pink-500/10 text-pink-400 hover:bg-pink-500/20 transition-all border border-pink-500/20"
+                          title="Instagram"
                         >
-                          Instagram
+                          <Instagram className="h-3 w-3" />
+                        </a>
+                      )}
+                      {lead.email && (
+                        <a 
+                          href={`mailto:${lead.email}`}
+                          className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-all border border-blue-500/20"
+                          title={lead.email}
+                        >
+                          <Mail className="h-3 w-3" />
                         </a>
                       )}
                     </div>
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                    <MapPin className="h-3 w-3 shrink-0" />
-                    <span className="truncate max-w-[200px]">{lead.address}</span>
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <MapPin className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                    <span className="max-w-[180px] break-words leading-relaxed">{lead.address || "Local não informado"}</span>
                   </div>
                 </TableCell>
-                <TableCell>
-                  <Badge 
-                    variant={lead.status === 'Contatado' ? 'default' : 'secondary'}
-                    className={lead.status === 'Contatado' ? 'bg-accent/20 text-accent hover:bg-accent/30 border-accent/20 border shadow-none' : ''}
-                  >
-                    {lead.status}
-                  </Badge>
+                <TableCell className="text-center">
+                  <div className="flex items-center justify-center gap-1.5">
+                    <Badge 
+                      className={`
+                        px-2.5 py-0.5 rounded-full text-[10px] font-bold border
+                        ${lead.status === 'Qualificado' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 
+                          lead.status === 'Desqualificado' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
+                          lead.status === 'Contatado' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                          'bg-slate-800 text-slate-400 border-slate-700'}
+                      `}
+                    >
+                      {lead.status}
+                    </Badge>
+                  </div>
                 </TableCell>
-                <TableCell className="text-right">
-                  <Button
-                    size="sm"
-                    onClick={() => onContact(lead)}
-                    className="bg-accent hover:bg-accent/90 text-white gap-2 shadow-sm"
-                  >
-                    <MessageSquare className="h-4 w-4" />
-                    WhatsApp
-                  </Button>
+                <TableCell className="text-right pr-6">
+                  <div className="flex items-center justify-end gap-2">
+                    <div className="flex gap-1 mr-2 border-r border-slate-800 pr-3">
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="h-8 w-8 text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-400"
+                        onClick={() => onUpdateStatus(lead.id, 'Qualificado')}
+                        title="Qualificar"
+                      >
+                        <CheckCircle2 className="h-4.5 w-4.5" />
+                      </Button>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="h-8 w-8 text-rose-500 hover:bg-rose-500/10 hover:text-rose-400"
+                        onClick={() => onUpdateStatus(lead.id, 'Desqualificado')}
+                        title="Desqualificar"
+                      >
+                        <XCircle className="h-4.5 w-4.5" />
+                      </Button>
+                    </div>
+                    
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        onUpdateStatus(lead.id, 'Contatado');
+                        if (lead.phone) handleWhatsApp(lead.phone);
+                      }}
+                      className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold gap-2 shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all hover:scale-105 active:scale-95"
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                      VENDER
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))
