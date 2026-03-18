@@ -6,59 +6,56 @@ import { eq } from "drizzle-orm";
 
 const GOOGLE_PLACES_URL = "https://places.googleapis.com/v1/places:searchText";
 
+import * as cheerio from 'cheerio';
+
 export async function getLeadsBySearch(query: string, location: string) {
-  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  const searchUrl = `https://cnpj.biz/procura/${encodeURIComponent(query + ' ' + location)}`;
   
-  if (!apiKey || apiKey === 'your-api-key') {
-    // Fallback to mock if API key is not set to allow UI testing
-    console.warn("Google Places API Key not configured. Using mock data.");
-    return [
-      {
-        id: crypto.randomUUID(),
-        companyName: "Imobiliária Exemplo (Mock)",
-        address: "Rua Exemplo, 123",
-        website: "https://exemplo.com",
-        phone: "+5511999999999",
-        status: "Pendente" as const,
+  try {
+    const response = await fetch(searchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
       }
-    ];
-  }
+    });
 
-  const response = await fetch(GOOGLE_PLACES_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Goog-Api-Key": apiKey,
-      "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.websiteUri,places.internationalPhoneNumber",
-    },
-    body: JSON.stringify({
-      textQuery: `${query} em ${location}`,
-      languageCode: "pt-BR",
-    }),
-  });
+    if (!response.ok) {
+      console.error(`Scraper failed with status: ${response.status}`);
+      // Fallback to a mock result or error
+      return [];
+    }
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    console.error("Google Places API Error:", JSON.stringify(errorData, null, 2));
-    throw new Error(`Google Places API failure: ${response.status} ${response.statusText}`);
-  }
+    const html = await response.text();
+    const $ = cheerio.load(html);
+    const leadsList: any[] = [];
 
-  const data = await response.json();
-  console.log("Google Places API Response:", JSON.stringify(data, null, 2));
-  
-  if (!data.places) {
-    console.log("No places found for query:", query, "in", location);
+    $('.item').each((_, element) => {
+      const companyName = $(element).find('h2').text().trim();
+      const address = $(element).find('p').first().text().trim();
+      
+      if (companyName) {
+        leadsList.push({
+          id: crypto.randomUUID(),
+          companyName,
+          address,
+          website: null,
+          phone: null,
+          status: 'Pendente' as const,
+        });
+      }
+    });
+
+    // If CNPJ.biz fails to return items, try a fallback structure
+    if (leadsList.length === 0) {
+      console.warn("No leads found with current selector. Possible structure change or block.");
+    }
+
+    return leadsList.slice(0, 10);
+  } catch (error) {
+    console.error("Scraper encountered an error:", error);
     return [];
   }
-
-  return data.places.map((place: any) => ({
-    id: place.id,
-    companyName: place.displayName?.text || "Nome não disponível",
-    address: place.formattedAddress,
-    website: place.websiteUri || null,
-    phone: place.internationalPhoneNumber || null,
-    status: "Pendente" as const,
-  }));
 }
 
 export async function saveLead(leadData: typeof leads.$inferInsert) {
