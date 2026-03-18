@@ -5,6 +5,7 @@ import { leads } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import * as cheerio from 'cheerio';
 
 async function fetchSearchPage(query: string, location: string) {
   const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query + ' ' + location + ' telefone endereço site')}`;
@@ -32,18 +33,15 @@ export async function getLeadsBySearch(query: string, location: string) {
 
   const rawHtml = await fetchSearchPage(query, location);
   
-  // 1. Tentar Gemini via REST API (Mais estável que o SDK)
+  // 1. Tentar Gemini via REST API
   try {
     const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-    
     const prompt = `Extraia leads de "${query}" em "${location}" deste texto. Retorne apenas JSON []. TEXTO: ${rawHtml.substring(0, 3000)}`;
 
     const response = await fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
-      })
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
     });
 
     if (response.ok) {
@@ -56,17 +54,14 @@ export async function getLeadsBySearch(query: string, location: string) {
         }));
       }
     }
-    console.warn("Gemini REST falhou ou retornou vazio, usando Fallback de Scraping Local...");
-  } catch (e) {
-    console.error("Erro no Gemini REST:", e);
-  }
+  } catch (e) { console.error("Erro no Gemini REST:", e); }
 
-  // 2. Fallback: Scraping Local (Garante resultados mesmo sem IA)
+  // 2. Fallback: Scraping Local
   const $ = cheerio.load(rawHtml);
   const localLeads: any[] = [];
   
-  $('.result').each((i, el) => {
-    if (i >= 10) return;
+  $('.result').each((i: number, el: any) => {
+    if (i >= 15) return;
     const name = $(el).find('.result__title').text().trim();
     const snippet = $(el).find('.result__snippet').text().trim();
     const link = $(el).find('.result__url').text().trim();
@@ -75,9 +70,9 @@ export async function getLeadsBySearch(query: string, location: string) {
       localLeads.push({
         id: crypto.randomUUID(),
         companyName: name,
-        address: snippet.substring(0, 100),
+        address: snippet.substring(0, 120),
         website: link || null,
-        phone: "Ver no site", // Scraper básico não pega telefone fácil sem abrir o link
+        phone: "Ver no site",
         status: 'Pendente' as const
       });
     }
