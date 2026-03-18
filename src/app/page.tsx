@@ -26,6 +26,8 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [page, setPage] = useState(0);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [campaignMessage, setCampaignMessage] = useState("Olá {EMPRESA}, vi seu perfil no Google e achei seu trabalho fantástico! Gostaria de conversar sobre uma parceria.");
   const [error, setError] = useState<string | null>(null);
   const [lastSearch, setLastSearch] = useState({ query: "", location: "" });
 
@@ -43,6 +45,34 @@ export default function Home() {
       setIsLoading(false);
     }
   }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds(prev => 
+      prev.length === leads.length ? [] : leads.map(l => l.id)
+    );
+  };
+
+  const startCampaign = () => {
+    const selectedLeads = leads.filter(l => selectedIds.includes(l.id));
+    if (selectedLeads.length === 0) return;
+
+    selectedLeads.forEach((lead, index) => {
+      // Pequeno delay fake ou lógica de abertura sequencial
+      setTimeout(() => {
+        const text = campaignMessage.replace(/{EMPRESA}/g, lead.companyName);
+        const cleanPhone = lead.phone?.replace(/\D/g, '');
+        if (cleanPhone) {
+          window.open(`https://web.whatsapp.com/send?phone=${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}&text=${encodeURIComponent(text)}`, '_blank');
+        }
+      }, index * 1000); // Abre abas com intervalo de 1s para não travar
+    });
+  };
 
   const handleLoadMore = async () => {
     if (!lastSearch.query) return;
@@ -129,6 +159,38 @@ export default function Home() {
           </div>
         )}
 
+        {selectedIds.length > 0 && (
+          <section className="mb-12 animate-in zoom-in-95 duration-500">
+            <div className="bg-emerald-500/10 border border-emerald-500/20 p-8 rounded-[2rem] backdrop-blur-md">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-6">
+                <div>
+                  <h3 className="text-xl font-black text-emerald-400 uppercase italic">Campanha Billionaire</h3>
+                  <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">{selectedIds.length} leads selecionados para ataque</p>
+                </div>
+                <Button 
+                  onClick={startCampaign}
+                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black uppercase text-sm px-10 h-14 rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.3)] transition-all hover:scale-105"
+                >
+                  Iniciar Disparos em Massa 🚀
+                </Button>
+              </div>
+              
+              <div className="space-y-3">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Script de Vendas IA (Template)</label>
+                <div className="relative">
+                  <textarea 
+                    value={campaignMessage}
+                    onChange={(e) => setCampaignMessage(e.target.value)}
+                    className="w-full bg-slate-950/80 border-2 border-slate-800 rounded-2xl p-4 text-slate-200 text-sm focus:border-emerald-500/50 focus:outline-none min-h-[100px] font-medium"
+                    placeholder="Use {EMPRESA} para personalizar..."
+                  />
+                  <div className="absolute bottom-4 right-4 text-[10px] font-bold text-slate-600 uppercase">Dica: use &#123;EMPRESA&#125;</div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
         <section className="animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300">
           <div className="flex items-center justify-between mb-6 px-4">
             <h2 className="text-sm font-black text-slate-100 uppercase tracking-widest flex items-center gap-2">
@@ -137,7 +199,13 @@ export default function Home() {
             </h2>
             <p className="text-[10px] font-bold text-slate-500">{leads.length} OPORTUNIDADES IDENTIFICADAS</p>
           </div>
-          <ResultsTable leads={leads} onUpdateStatus={handleUpdateStatus} />
+          <ResultsTable 
+            leads={leads} 
+            onUpdateStatus={handleUpdateStatus} 
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+            onToggleAll={toggleSelectAll}
+          />
           
           {leads.length > 0 && (
             <div className="mt-8 flex justify-center">

@@ -7,10 +7,15 @@ import { Lead } from "@/app/page";
 interface ResultsTableProps {
   leads: Lead[];
   onUpdateStatus: (id: string, status: Lead['status']) => void;
+  selectedIds: string[];
+  onToggleSelect: (id: string) => void;
+  onToggleAll: () => void;
 }
 
-export function ResultsTable({ leads, onUpdateStatus }: ResultsTableProps) {
-  const handleWhatsApp = (phone: string) => {
+export function ResultsTable({ leads, onUpdateStatus, selectedIds, onToggleSelect, onToggleAll }: ResultsTableProps) {
+  const allSelected = leads.length > 0 && selectedIds.length === leads.length;
+
+  const handleWhatsApp = (phone: string, companyName?: string) => {
     const cleanPhone = phone.replace(/\D/g, '');
     if (!cleanPhone) return;
     const message = encodeURIComponent("Olá! Vi seu perfil e gostaria de conversar sobre seus serviços.");
@@ -23,6 +28,14 @@ export function ResultsTable({ leads, onUpdateStatus }: ResultsTableProps) {
       <Table>
         <TableHeader className="bg-slate-900/80 border-b border-slate-800">
           <TableRow className="hover:bg-transparent border-slate-800">
+            <TableHead className="w-12 px-4">
+              <input 
+                type="checkbox" 
+                checked={allSelected}
+                onChange={onToggleAll}
+                className="h-4 w-4 rounded border-slate-700 bg-slate-950 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-slate-900"
+              />
+            </TableHead>
             <TableHead className="text-slate-300 font-semibold py-4">Lead / Canais</TableHead>
             <TableHead className="text-slate-300 font-semibold">Localização</TableHead>
             <TableHead className="text-slate-300 font-semibold text-center">Qualificação</TableHead>
@@ -42,7 +55,18 @@ export function ResultsTable({ leads, onUpdateStatus }: ResultsTableProps) {
             </TableRow>
           ) : (
             leads.map((lead) => (
-              <TableRow key={lead.id} className="group border-slate-800/50 hover:bg-slate-800/30 transition-all duration-300">
+              <TableRow 
+                key={lead.id} 
+                className={`group border-slate-800/50 hover:bg-slate-800/30 transition-all duration-300 ${selectedIds.includes(lead.id) ? 'bg-emerald-500/5' : ''}`}
+              >
+                <TableCell className="px-4">
+                  <input 
+                    type="checkbox" 
+                    checked={selectedIds.includes(lead.id)}
+                    onChange={() => onToggleSelect(lead.id)}
+                    className="h-4 w-4 rounded border-slate-700 bg-slate-950 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-slate-900 cursor-pointer"
+                  />
+                </TableCell>
                 <TableCell>
                   <div className="flex flex-col gap-1.5 py-1">
                     <span className="font-bold text-slate-100 group-hover:text-emerald-400 transition-colors uppercase tracking-tight text-sm">
