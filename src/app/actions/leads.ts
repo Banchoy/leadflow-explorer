@@ -31,47 +31,59 @@ export async function getLeadsBySearch(query: string, location: string) {
   }
 
   const rawHtml = await fetchSearchPage(query, location);
-  const genAI = new GoogleGenerativeAI(apiKey);
   
-  // Try different models in sequence to avoid 404
-  const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"];
-  let lastError = null;
+  // 1. Tentar Gemini via REST API (Mais estável que o SDK)
+  try {
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    
+    const prompt = `Extraia leads de "${query}" em "${location}" deste texto. Retorne apenas JSON []. TEXTO: ${rawHtml.substring(0, 3000)}`;
 
-  for (const modelName of modelsToTry) {
-    try {
-      console.log(`Tentando busca com modelo: ${modelName}`);
-      const model = genAI.getGenerativeModel({ model: modelName });
-      
-      const prompt = `
-        Abaixo está o conteúdo de uma busca. Extraia até 10 leads de "${query}" em "${location}".
-        Retorne APENAS um array JSON: [{"id": "uuid", "companyName": "...", "address": "...", "website": "...", "phone": "...", "status": "Pendente"}]
-        
-        CONTEÚDO:
-        ${rawHtml.substring(0, 4000)}
-      `;
+    const response = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }]
+      })
+    });
 
-      const result = await model.generateContent(prompt);
-      const responseText = result.response.text();
-      const jsonStart = responseText.indexOf('[');
-      const jsonEnd = responseText.lastIndexOf(']');
-      
-      if (jsonStart !== -1 && jsonEnd !== -1) {
-        const leads = JSON.parse(responseText.substring(jsonStart, jsonEnd + 1));
-        return leads.map((l: any) => ({
-          ...l,
-          id: l.id || crypto.randomUUID(),
-          status: 'Pendente' as const
+    if (response.ok) {
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]).map((l: any) => ({
+          ...l, id: l.id || crypto.randomUUID(), status: 'Pendente' as const
         }));
       }
-    } catch (err: any) {
-      console.error(`Erro no modelo ${modelName}:`, err.message || err);
-      lastError = err;
-      continue;
     }
+    console.warn("Gemini REST falhou ou retornou vazio, usando Fallback de Scraping Local...");
+  } catch (e) {
+    console.error("Erro no Gemini REST:", e);
   }
 
-  console.error("Todos os modelos Falharam.", lastError);
-  return [];
+  // 2. Fallback: Scraping Local (Garante resultados mesmo sem IA)
+  const $ = cheerio.load(rawHtml);
+  const localLeads: any[] = [];
+  
+  $('.result').each((i, el) => {
+    if (i >= 10) return;
+    const name = $(el).find('.result__title').text().trim();
+    const snippet = $(el).find('.result__snippet').text().trim();
+    const link = $(el).find('.result__url').text().trim();
+    
+    if (name) {
+      localLeads.push({
+        id: crypto.randomUUID(),
+        companyName: name,
+        address: snippet.substring(0, 100),
+        website: link || null,
+        phone: "Ver no site", // Scraper básico não pega telefone fácil sem abrir o link
+        status: 'Pendente' as const
+      });
+    }
+  });
+
+  return localLeads;
 }
 
 export async function saveLead(leadData: typeof leads.$inferInsert) {
