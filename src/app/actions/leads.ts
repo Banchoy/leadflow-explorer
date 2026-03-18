@@ -4,15 +4,31 @@ import { db } from "@/db";
 import { leads } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
-const GOOGLE_PLACES_URL = "https://places.googleapis.com/v1/places:searchText";
-
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import * as cheerio from 'cheerio';
+
+async function fetchSearchData(query: string, location: string) {
+  // Using DuckDuckGo HTML version for easier scraping
+  const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query + ' ' + location + ' telefone endereço')}`;
+  
+  try {
+    const response = await fetch(searchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+    
+    if (!response.ok) return "Erro ao buscar dados externos.";
+    return await response.text();
+  } catch (error) {
+    return "Falha na conexão de busca.";
+  }
+}
 
 export async function getLeadsBySearch(query: string, location: string) {
   const apiKey = process.env.GOOGLE_AI_STUDIO_KEY;
   
   if (!apiKey || apiKey === 'your-api-key') {
-    console.warn("Google AI Studio Key not configured. Using mock data.");
     return [
       {
         id: crypto.randomUUID(),
@@ -26,60 +42,58 @@ export async function getLeadsBySearch(query: string, location: string) {
   }
 
   try {
+    // Stage 1: Get raw search data
+    console.log(`Billionaire Shadow: Buscando dados brutos para ${query}...`);
+    const rawHtml = await fetchSearchData(query, location);
+    
+    // Stage 2: Let Gemini parse the mess
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
-      // Using the Search tool (grounding)
-      tools: [
-        {
-          // @ts-ignore - Some TS versions might not have this tool in types yet
-          googleSearch: {},
-        },
-      ],
-    } as any);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `
-      Aja como um especialista em prospecção B2B. Sua tarefa é encontrar leads reais e atualizados.
-      USE A BUSCA DO GOOGLE (Search) para encontrar empresas do nicho "${query}" na região "${location}".
+      Aja como um analista de dados. Abaixo está o HTML/texto de uma busca por empresas de "${query}" em "${location}".
+      Extraia até 10 leads reais deste texto.
       
-      Importante:
-      - Foque em empresas que apareceriam no Google Maps/Meu Negócio.
-      - Extraia Nome, Endereço Completo e TELEFONE (preferencialmente celular/WhatsApp).
-      - Retorne no máximo 15 resultados.
+      Dados Necessários:
+      - Nome da Empresa
+      - Endereço Completo
+      - Telefone (extraia dos snippets de busca)
+      - Website
 
-      FORMATO OBRIGATÓRIO (retorne APENAS o JSON, sem explicações):
+      RETORNE APENAS UM ARRAY JSON VÁLIDO NO FORMATO:
       [
         {
-          "id": "string-unica",
-          "companyName": "Nome da Empresa",
-          "address": "Endereço Completo",
+          "id": "gerar-uuid",
+          "companyName": "Nome",
+          "address": "Endereço",
           "website": "URL ou null",
           "phone": "Telefone ou null",
           "status": "Pendente"
         }
       ]
+
+      TEXTO DE BUSCA:
+      ${rawHtml.substring(0, 5000)} // Limiting to avoid token overflow
     `;
 
-    console.log(`Iniciando busca Gemini para: ${query} em ${location}`);
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
-    console.log("Resposta bruta do Gemini:", responseText);
     
-    // Clean JSON response (look for the first [ and the last ])
-    const firstBracket = responseText.indexOf('[');
-    const lastBracket = responseText.lastIndexOf(']');
+    const jsonStart = responseText.indexOf('[');
+    const jsonEnd = responseText.lastIndexOf(']');
     
-    if (firstBracket === -1 || lastBracket === -1) {
-      console.error("Gemini não retornou um formato JSON válido.");
-      return [];
-    }
+    if (jsonStart === -1 || jsonEnd === -1) return [];
 
-    const jsonString = responseText.substring(firstBracket, lastBracket + 1);
+    const jsonString = responseText.substring(jsonStart, jsonEnd + 1);
     const leads = JSON.parse(jsonString);
-    console.log(`Sucesso! Encontrados ${leads.length} leads.`);
-    return leads;
-  } catch (error: any) {
-    console.error("Falha na busca do Gemini:", error.message || error);
+    
+    return leads.map((l: any) => ({
+      ...l,
+      id: l.id || crypto.randomUUID(),
+      status: 'Pendente' as const
+    }));
+  } catch (error) {
+    console.error("Erro na busca híbrida:", error);
     return [];
   }
 }
