@@ -4,7 +4,7 @@ import { useState } from "react";
 import { SearchForm } from "@/components/search-form";
 import { ResultsTable } from "@/components/results-table";
 import { getLeadsBySearch, updateLeadStatus } from "./actions/leads";
-import { useUser } from "@clerk/nextjs";
+import { useUser, SignInButton } from "@clerk/nextjs";
 
 interface Lead {
   id: string;
@@ -12,6 +12,7 @@ interface Lead {
   address: string | null;
   website: string | null;
   phone: string | null;
+  instagram?: string | null;
   status: 'Pendente' | 'Contatado';
 }
 
@@ -67,13 +68,14 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-4">
             {!isSignedIn ? (
-              <button 
-                onClick={() => window.location.href = '/sign-in'}
-                className="flex items-center gap-2 bg-white border border-gray-300 rounded-full px-6 py-2 shadow-sm hover:shadow-md transition-all text-sm font-semibold"
-              >
-                <img src="https://www.google.com/favicon.ico" className="w-4 h-4" alt="Google" />
-                Conectar com Google
-              </button>
+              <SignInButton mode="modal">
+                <button 
+                  className="flex items-center gap-2 bg-white border border-gray-300 rounded-full px-6 py-2 shadow-sm hover:shadow-md transition-all text-sm font-semibold"
+                >
+                  <img src="https://www.google.com/favicon.ico" className="w-4 h-4" alt="Google" />
+                  Conectar com Google
+                </button>
+              </SignInButton>
             ) : (
               <div className="flex items-center gap-3 bg-primary/5 p-2 rounded-full border border-primary/20 px-4">
                 <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />

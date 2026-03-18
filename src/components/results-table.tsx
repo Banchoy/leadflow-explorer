@@ -9,6 +9,7 @@ interface Lead {
   address: string | null;
   website: string | null;
   phone: string | null;
+  instagram?: string | null;
   status: 'Pendente' | 'Contatado';
 }
 
@@ -40,18 +41,30 @@ export function ResultsTable({ leads, onContact }: ResultsTableProps) {
             leads.map((lead) => (
               <TableRow key={lead.id} className="hover:bg-muted/30 transition-colors">
                 <TableCell className="font-medium">
-                  <div className="flex flex-col">
+                  <div className="flex flex-col gap-1">
                     <span>{lead.companyName}</span>
-                    {lead.website && (
-                      <a 
-                        href={lead.website} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-xs text-primary flex items-center gap-1 hover:underline w-fit"
-                      >
-                        {lead.website.replace(/^https?:\/\//, '')} <ExternalLink className="h-3 w-3" />
-                      </a>
-                    )}
+                    <div className="flex flex-wrap gap-2">
+                      {lead.website && (
+                        <a 
+                          href={lead.website} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-[10px] bg-primary/5 text-primary px-1.5 py-0.5 rounded flex items-center gap-1 hover:bg-primary/10 transition-colors"
+                        >
+                          Site <ExternalLink className="h-2 w-2" />
+                        </a>
+                      )}
+                      {lead.instagram && (
+                        <a 
+                          href={lead.instagram.startsWith('http') ? lead.instagram : `https://instagram.com/${lead.instagram.replace('@', '')}`}
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-[10px] bg-pink-50 text-pink-600 px-1.5 py-0.5 rounded flex items-center gap-1 hover:bg-pink-100 transition-colors border border-pink-100"
+                        >
+                          Instagram
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </TableCell>
                 <TableCell>
