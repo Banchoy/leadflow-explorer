@@ -37,13 +37,23 @@ export async function getLeadsBySearch(query: string, location: string) {
     }),
   });
 
+  if (!response.ok) {
+    const errorData = await response.json();
+    console.error("Google Places API Error:", JSON.stringify(errorData, null, 2));
+    throw new Error(`Google Places API failure: ${response.status} ${response.statusText}`);
+  }
+
   const data = await response.json();
+  console.log("Google Places API Response:", JSON.stringify(data, null, 2));
   
-  if (!data.places) return [];
+  if (!data.places) {
+    console.log("No places found for query:", query, "in", location);
+    return [];
+  }
 
   return data.places.map((place: any) => ({
     id: place.id,
-    companyName: place.displayName.text,
+    companyName: place.displayName?.text || "Nome não disponível",
     address: place.formattedAddress,
     website: place.websiteUri || null,
     phone: place.internationalPhoneNumber || null,
