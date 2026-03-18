@@ -24,18 +24,45 @@ export default function Home() {
   const { isLoaded, isSignedIn, user } = useUser();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [page, setPage] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [lastSearch, setLastSearch] = useState({ query: "", location: "" });
 
   const handleSearch = async (query: string, location: string) => {
     setIsLoading(true);
+    setPage(0);
     setError(null);
+    setLastSearch({ query, location });
     try {
-      const results = await getLeadsBySearch(query, location);
+      const results = await getLeadsBySearch(query, location, 0);
       setLeads(results);
     } catch (error) {
       console.error("Search failed:", error);
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  const handleLoadMore = async () => {
+    if (!lastSearch.query) return;
+    setIsLoadingMore(true);
+    const nextPage = page + 1;
+    try {
+      const moreLeads = await getLeadsBySearch(lastSearch.query, lastSearch.location, nextPage);
+      
+      // Deduplicação básica por nome
+      setLeads((prev: Lead[]) => {
+        const existingNames = new Set(prev.map((l: Lead) => l.companyName.toLowerCase()));
+        const uniqueNew = moreLeads.filter((l: Lead) => !existingNames.has(l.companyName.toLowerCase()));
+        return [...prev, ...uniqueNew];
+      });
+      
+      setPage(nextPage);
+    } catch (error) {
+      console.error("Load more failed:", error);
+    } finally {
+      setIsLoadingMore(false);
     }
   }
 
@@ -111,6 +138,26 @@ export default function Home() {
             <p className="text-[10px] font-bold text-slate-500">{leads.length} OPORTUNIDADES IDENTIFICADAS</p>
           </div>
           <ResultsTable leads={leads} onUpdateStatus={handleUpdateStatus} />
+          
+          {leads.length > 0 && (
+            <div className="mt-8 flex justify-center">
+              <Button
+                onClick={handleLoadMore}
+                disabled={isLoadingMore}
+                variant="outline"
+                className="bg-slate-900/50 border-slate-700 text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/50 px-8 py-6 rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg transition-all active:scale-95"
+              >
+                {isLoadingMore ? (
+                  <div className="flex items-center gap-3">
+                    <div className="h-3 w-3 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                    Deep Search em andamento...
+                  </div>
+                ) : (
+                  "Expandir Varredura (Mais Leads)"
+                )}
+              </Button>
+            </div>
+          )}
         </section>
       </div>
     </main>

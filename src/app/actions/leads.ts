@@ -60,19 +60,24 @@ export interface Lead {
   priority?: "Alta" | "Média" | "Baixa";
 }
 
-export async function getLeadsBySearch(query: string, location: string) {
+export async function getLeadsBySearch(query: string, location: string, page: number = 0) {
   const apiKey = process.env.GOOGLE_AI_STUDIO_KEY || process.env.GOOGLE_PLACES_API_KEY;
   
+  // Variação de query para busca profunda (Deep Search)
+  const relatedTerms = ["", "contato", "unidade", "serviços", "telefone", "endereço", "site oficial", "instagram"];
+  const variation = relatedTerms[page % relatedTerms.length];
+  const enhancedQuery = variation ? `${query} ${variation}` : query;
+
   if (!apiKey || apiKey === 'your-api-key') {
     return [{
-      id: crypto.randomUUID(), companyName: "Billionaire Example", address: "São Paulo, SP",
+      id: crypto.randomUUID(), companyName: `Billionaire Example ${page}`, address: "São Paulo, SP",
       website: "https://example.com", phone: "11-99999-9999", instagram: "https://instagram.com/exemplo",
       status: "Pendente" as const, priority: "Alta" as const
     }];
   }
 
   // ESTRATÉGIA NO-API (Billionaire Shadow): Pesquisa + Gemini Parser
-  const rawHtml = await fetchSearchAlternative(query, location);
+  const rawHtml = await fetchSearchAlternative(enhancedQuery, location);
   
   if (!rawHtml || rawHtml.length < 500) {
     console.warn("[Billionaire Shadow] Nenhuma fonte retornou dados utilizáveis.");
