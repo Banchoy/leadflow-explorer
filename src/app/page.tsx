@@ -102,6 +102,7 @@ export default function Home() {
           </div>
         )}
 
+        <section className="animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300">
           <div className="flex items-center justify-between mb-6 px-4">
             <h2 className="text-sm font-black text-slate-100 uppercase tracking-widest flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />

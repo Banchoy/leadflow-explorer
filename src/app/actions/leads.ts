@@ -178,6 +178,9 @@ export async function saveLead(leadData: typeof leads.$inferInsert) {
   return await db.insert(leads).values(leadData).returning();
 }
 
-export async function updateLeadStatus(id: string, status: 'Pendente' | 'Contatado') {
-  return await db.update(leads).set({ status }).where(eq(leads.id, id)).returning();
+export async function updateLeadStatus(id: string, status: 'Pendente' | 'Contatado' | 'Qualificado' | 'Desqualificado') {
+  return await db.update(leads)
+    .set({ status })
+    .where(eq(leads.id, id))
+    .returning();
 }
