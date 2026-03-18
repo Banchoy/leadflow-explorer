@@ -1,5 +1,4 @@
 {
   "framework": "nextjs",
-  "regions": ["sao1"],
   "cleanUrls": true
 }
