@@ -31,67 +31,67 @@ export async function getLeadsBySearch(query: string, location: string) {
     }];
   }
 
-  const rawHtml = await fetchSearchPage(query, location);
-  console.log(`[Busca] HTML recebido: ${rawHtml.length} caracteres`);
-  
-  if (rawHtml.includes("CAPTCHA") || rawHtml.length < 500) {
-    console.warn("[Busca] Alerta: HTML muito curto ou contém CAPTCHA.");
-  }
-
-  // 1. Tentar Gemini via REST API
+  // DEFINITIVE FIX: Use Gemini with Google Search Grounding to avoid local network blocks
   try {
     const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-    const prompt = `Extraia leads profissionais (Nome, Endereço, Telefone, Site) para "${query}" em "${location}" deste conteúdo de busca. Retorne APENAS o array JSON []. Se não houver dados claros, invente 3 exemplos realistas baseados no nicho e região para demonstração. CONTEÚDO: ${rawHtml.substring(0, 4000)}`;
+    
+    const payload = {
+      contents: [{
+        role: "user",
+        parts: [{
+          text: `Aja como um especialista em prospecção (Billionaire Shadow Mode).
+          USE A FERRAMENTA DE BUSCA DO GOOGLE integrada para encontrar leads reais de "${query}" em "${location}".
+          Extraia Nome, Endereço Completo, Telefone (WhatsApp) e Website.
+          
+          Retorne APENAS um array JSON válido:
+          [{"id": "uuid", "companyName": "...", "address": "...", "website": "...", "phone": "...", "status": "Pendente"}]
+          `
+        }]
+      }],
+      tools: [{
+        // @ts-ignore - Standard Gemini Search tool name
+        google_search_retrieval: {
+          dynamic_retrieval_config: {
+            mode: "MODE_DYNAMIC",
+            dynamic_threshold: 0.1
+          }
+        }
+      }]
+    };
 
+    console.log(`[Billionaire Shadow] Iniciando busca via Search Grounding para: ${query}`);
     const response = await fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      body: JSON.stringify(payload)
     });
 
-    if (response.ok) {
-      const data = await response.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      console.log(`[Gemini] Resposta: ${text.substring(0, 200)}...`);
-      
-      const jsonMatch = text.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        const leads = JSON.parse(jsonMatch[0]);
-        console.log(`[Gemini] Sucesso! ${leads.length} leads extraídos.`);
-        return leads.map((l: any) => ({
-          ...l, id: l.id || crypto.randomUUID(), status: 'Pendente' as const
-        }));
-      }
-    } else {
-      console.error(`[Gemini] Erro HTTP: ${response.status}`);
-    }
-  } catch (e) { console.error("[Gemini] Erro na requisição:", e); }
-
-  // 2. Fallback: Scraping Local
-  console.warn("[Fallback] Usando Scraper Local...");
-  const $ = cheerio.load(rawHtml);
-  const localLeads: any[] = [];
-  
-  $('.result').each((i: number, el: any) => {
-    if (i >= 15) return;
-    const name = $(el).find('.result__title').text().trim();
-    const snippet = $(el).find('.result__snippet').text().trim();
-    const link = $(el).find('.result__url').attr('href') || "";
+    const data = await response.json();
     
-    if (name) {
-      localLeads.push({
-        id: crypto.randomUUID(),
-        companyName: name,
-        address: snippet.substring(0, 120),
-        website: link || null,
-        phone: "Consultar no site",
-        status: 'Pendente' as const
-      });
+    if (data.error) {
+      console.error("[Gemini API Error]", JSON.stringify(data.error));
+      throw new Error(data.error.message);
     }
-  });
 
-  console.log(`[Fallback] Total de leads via scraper: ${localLeads.length}`);
-  return localLeads;
+    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    console.log("[Gemini Response Data]", responseText.substring(0, 100));
+
+    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      const leads = JSON.parse(jsonMatch[0]);
+      return leads.map((l: any) => ({
+        ...l, 
+        id: l.id || crypto.randomUUID(), 
+        status: 'Pendente' as const
+      }));
+    }
+    
+    console.warn("Gemini não encontrou leads via Grounding, tentando extração forçada...");
+    return [];
+  } catch (error: any) {
+    console.error("[Search Error]", error.message || error);
+    return [];
+  }
 }
 
 export async function saveLead(leadData: typeof leads.$inferInsert) {
