@@ -81,7 +81,15 @@ export async function getLeadsBySearch(query: string, location: string) {
       INSTRUÇÕES:
       1. Leia o HTML e extraia até 15 empresas.
       2. Foque em: Nome, Endereço, Website, Telefone/WhatsApp (FORMATO: +55...) e Instagram.
-      3. Retorne APENAS o  try {
+      3. Retorne APENAS o array JSON, sem texto explicativo.
+
+      JSON FORMAT:
+      [{"companyName": "...", "address": "...", "website": "...", "phone": "...", "instagram": "...", "status": "Pendente"}]
+      
+      HTML DA BUSCA:
+      ${rawHtml.substring(0, 25000)}
+    `;
+
     const cleanKey = apiKey.trim();
     console.log(`[Gemini] Diagnóstico: Validando chave ${cleanKey.substring(0, 7)}...`);
 
@@ -95,20 +103,15 @@ export async function getLeadsBySearch(query: string, location: string) {
         const availableModels = listData.models?.map((m: any) => m.name.split('/').pop()) || [];
         console.log("[Gemini] Modelos disponíveis:", availableModels.join(", "));
         if (availableModels.length > 0) {
-          // Prioridade: flash > flash-latest > pro
           modelName = availableModels.find((m: string) => m.includes("flash")) || availableModels[0];
         }
-      } else {
-        console.warn(`[Gemini] Falha ao listar modelos (Status ${listRes.status}). Usando padrão.`);
       }
     } catch (e) {
       console.warn("[Gemini] Erro no Discovery de modelos.");
     }
 
-    // 2. Tentar as combinações
+    // 2. Tentar as combinações de API
     const apiVersions = ["v1beta", "v1"];
-    let lastError = "";
-
     for (const apiVer of apiVersions) {
       try {
         const geminiUrl = `https://generativelanguage.googleapis.com/${apiVer}/models/${modelName}:generateContent?key=${cleanKey}`;
@@ -129,12 +132,9 @@ export async function getLeadsBySearch(query: string, location: string) {
             console.log(`[Gemini] Sucesso com ${modelName}!`);
             return leads.map((l: any) => ({ ...l, id: crypto.randomUUID(), status: 'Pendente' as const }));
           }
-        } else {
-          lastError = data.error?.message || `Status ${response.status}`;
         }
-      } catch (e: any) { lastError = e.message; }
+      } catch (e) { }
     }
-    console.error("[Gemini] Todas as rotas falharam:", lastError);
   } catch (error: any) { console.error("[Billionaire Shadow Error]", error); }
 
   // 3. FALLBACK FINAL: Scraper Manual (Garante que nunca venha vazio se houver HTML)
