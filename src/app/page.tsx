@@ -19,14 +19,20 @@ export default function Home() {
   const { isLoaded, isSignedIn, user } = useUser();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSearch = async (query: string, location: string) => {
     setIsLoading(true);
+    setError(null);
     try {
       const results = await getLeadsBySearch(query, location);
+      if (results.length === 0) {
+        setError("Nenhum lead encontrado. Verifique se o nicho e a localização estão corretos ou se sua chave de API do Google tem permissões para 'Places API (New)'.");
+      }
       setLeads(results);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Search failed:", error);
+      setError(`Erro na busca: ${error.message || "Erro desconhecido"}. Verifique os logs da Vercel para mais detalhes.`);
     } finally {
       setIsLoading(false);
     }
@@ -69,6 +75,12 @@ export default function Home() {
         <section>
           <SearchForm onSearch={handleSearch} isLoading={isLoading} />
         </section>
+
+        {error && (
+          <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-lg text-sm flex items-center justify-center gap-2">
+            <span>⚠️</span> {error}
+          </div>
+        )}
 
         <section className="space-y-4">
           <div className="flex items-center justify-between">
