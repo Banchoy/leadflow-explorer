@@ -6,17 +6,19 @@ import { eq } from "drizzle-orm";
 
 const GOOGLE_PLACES_URL = "https://places.googleapis.com/v1/places:searchText";
 
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
 export async function getLeadsBySearch(query: string, location: string) {
-  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  const apiKey = process.env.GOOGLE_AI_STUDIO_KEY;
   
   if (!apiKey || apiKey === 'your-api-key') {
-    console.warn("Google Places API Key not configured. Using mock data.");
+    console.warn("Google AI Studio Key not configured. Using mock data.");
     return [
       {
         id: crypto.randomUUID(),
-        companyName: "Imobiliária Exemplo (Mock)",
-        address: "Rua Exemplo, 123",
-        website: "https://exemplo.com",
+        companyName: "Academia Performance (Mock)",
+        address: "Av. Paulista, 1000 - São Paulo",
+        website: "https://performance.com",
         phone: "+5511999999999",
         status: "Pendente" as const,
       }
@@ -24,40 +26,55 @@ export async function getLeadsBySearch(query: string, location: string) {
   }
 
   try {
-    const response = await fetch(GOOGLE_PLACES_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": apiKey,
-        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.websiteUri,places.internationalPhoneNumber",
-      },
-      body: JSON.stringify({
-        textQuery: `${query} em ${location}`,
-        languageCode: "pt-BR",
-      }),
-    });
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      // Using the Search tool (grounding)
+      tools: [
+        {
+          // @ts-ignore - Some TS versions might not have this tool in types yet
+          googleSearch: {},
+        },
+      ],
+    } as any);
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("Google Places API Error:", JSON.stringify(errorData, null, 2));
-      throw new Error(`Google Places API failure: ${response.status} ${response.statusText}`);
+    const prompt = `
+      Encontre uma lista de até 15 empresas (leads) para o nicho "${query}" na localização "${location}" no Brasil.
+      Para cada empresa, retorne:
+      1. Nome da empresa
+      2. Endereço completo
+      3. Telefone (se disponível, priorizando celular/WhatsApp)
+      4. Website (se disponível)
+
+      Retorne APENAS um array JSON válido no seguinte formato, sem explicações:
+      [
+        {
+          "id": "gerar um id único aqui",
+          "companyName": "Nome",
+          "address": "Endereço",
+          "website": "URL ou null",
+          "phone": "Telefone ou null",
+          "status": "Pendente"
+        }
+      ]
+    `;
+
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text();
+    
+    // Clean JSON response (Markdown blocks)
+    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      console.error("Gemini failed to return valid JSON:", responseText);
+      return [];
     }
 
-    const data = await response.json();
-    
-    if (!data.places) return [];
-
-    return data.places.map((place: any) => ({
-      id: place.id,
-      companyName: place.displayName?.text || "Nome não disponível",
-      address: place.formattedAddress,
-      website: place.websiteUri || null,
-      phone: place.internationalPhoneNumber || null,
-      status: "Pendente" as const,
-    }));
+    const leads = JSON.parse(jsonMatch[0]);
+    return leads;
   } catch (error) {
-    console.error("Search failed, attempting fallback or reporting error:", error);
-    throw error;
+    console.error("Gemini search failed:", error);
+    // Silent return to avoid UI crash, error state handled in Home
+    return [];
   }
 }
 
