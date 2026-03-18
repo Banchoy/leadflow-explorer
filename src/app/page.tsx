@@ -53,16 +53,16 @@ export default function Home() {
   };
 
   const toggleSelectAll = () => {
-    setSelectedIds(prev => 
-      prev.length === leads.length ? [] : leads.map(l => l.id)
+    setSelectedIds((prev: string[]) => 
+      prev.length === leads.length ? [] : leads.map((l: Lead) => l.id)
     );
   };
 
   const startCampaign = () => {
-    const selectedLeads = leads.filter(l => selectedIds.includes(l.id));
+    const selectedLeads = leads.filter((l: Lead) => selectedIds.includes(l.id));
     if (selectedLeads.length === 0) return;
 
-    selectedLeads.forEach((lead, index) => {
+    selectedLeads.forEach((lead: Lead, index: number) => {
       // Pequeno delay fake ou lógica de abertura sequencial
       setTimeout(() => {
         const text = campaignMessage.replace(/{EMPRESA}/g, lead.companyName);
