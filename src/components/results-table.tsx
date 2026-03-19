@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, ExternalLink, MapPin, CheckCircle2, XCircle, Mail, Instagram, TrendingUp } from "lucide-react";
+import { MessageSquare, ExternalLink, MapPin, CheckCircle2, XCircle, Mail, Instagram, TrendingUp, Zap } from "lucide-react";
 import { Lead } from "@/app/page";
 
 interface ResultsTableProps {
@@ -152,6 +153,29 @@ export function ResultsTable({ leads, onUpdateStatus, onEnrich, selectedIds, onT
                         <XCircle className="h-4.5 w-4.5" />
                       </Button>
                     </div>
+
+                    {lead.website && !lead.phone && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={async () => {
+                          setEnrichingId(lead.id);
+                          await onEnrich(lead.id, lead.website!);
+                          setEnrichingId(null);
+                        }}
+                        disabled={enrichingId === lead.id}
+                        className="border-violet-500/50 text-violet-400 hover:bg-violet-500/10 h-9 px-3 rounded-lg text-[10px] font-black uppercase tracking-tighter"
+                      >
+                        {enrichingId === lead.id ? (
+                          <div className="h-3 w-3 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <>
+                            <Zap className="h-3.5 w-3.5 mr-1" />
+                            Ghost Scraper
+                          </>
+                        )}
+                      </Button>
+                    )}
                     
                     <Button
                       size="sm"
