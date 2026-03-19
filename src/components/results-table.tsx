@@ -7,12 +7,14 @@ import { Lead } from "@/app/page";
 interface ResultsTableProps {
   leads: Lead[];
   onUpdateStatus: (id: string, status: Lead['status']) => void;
+  onEnrich: (id: string, website: string) => Promise<void>;
   selectedIds: string[];
   onToggleSelect: (id: string) => void;
   onToggleAll: () => void;
 }
 
-export function ResultsTable({ leads, onUpdateStatus, selectedIds, onToggleSelect, onToggleAll }: ResultsTableProps) {
+export function ResultsTable({ leads, onUpdateStatus, onEnrich, selectedIds, onToggleSelect, onToggleAll }: ResultsTableProps) {
+  const [enrichingId, setEnrichingId] = useState<string | null>(null);
   const allSelected = leads.length > 0 && selectedIds.length === leads.length;
 
   const handleWhatsApp = (phone: string, companyName?: string) => {

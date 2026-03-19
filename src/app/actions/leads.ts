@@ -189,3 +189,48 @@ export async function updateLeadStatus(id: string, status: 'Pendente' | 'Contata
     .where(eq(leads.id, id))
     .returning();
 }
+
+export async function enrichLeadData(id: string, website: string) {
+  if (!website || !website.startsWith('http')) return null;
+
+  try {
+    console.log(`[Ghost Scraper] Iniciando varredura em: ${website}`);
+    const response = await fetch(website, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+      next: { revalidate: 3600 }
+    });
+    
+    if (!response.ok) return null;
+    const html = await response.text();
+    const $ = cheerio.load(html);
+    
+    // Remove scripts e styles para limpar o texto
+    $('script, style, nav, footer').remove();
+    const cleanText = $('body').text().slice(0, 10000); // 10k chars iniciais
+
+    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_STUDIO_KEY!);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const prompt = `Analise o texto extraído do site da empresa e identifique o número de WhatsApp ou telefone de contato. 
+    Texto: ${cleanText}
+    Retorne APENAS um JSON: {"phone": "número com DDD", "email": "email se encontrar", "whatsappFound": true/false}`;
+
+    const result = await model.generateContent(prompt);
+    const data = JSON.parse(result.response.text().replace(/```json|```/g, ""));
+
+    if (data.phone) {
+      await db.update(leads)
+        .set({ 
+          phone: data.phone, 
+          email: data.email || null,
+          status: 'Qualificado' 
+        })
+        .where(eq(leads.id, id));
+      return data;
+    }
+    return null;
+  } catch (error) {
+    console.error("[Ghost Scraper Error]", error);
+    return null;
+  }
+}

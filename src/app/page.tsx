@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { SearchForm } from "@/components/search-form";
 import { ResultsTable } from "@/components/results-table";
-import { getLeadsBySearch, updateLeadStatus } from "./actions/leads";
+import { getLeadsBySearch, updateLeadStatus, enrichLeadData } from "./actions/leads";
 import { useUser, SignInButton } from "@clerk/nextjs";
-import { TrendingUp, Search, MapPin } from "lucide-react";
+import { TrendingUp, Search, MapPin, FastForward, PlayCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export interface Lead {
@@ -27,6 +27,7 @@ export default function Home() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [page, setPage] = useState(0);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [campaignIndex, setCampaignIndex] = useState<number | null>(null);
   const [campaignMessage, setCampaignMessage] = useState("Olá {EMPRESA}, vi seu perfil no Google e achei seu trabalho fantástico! Gostaria de conversar sobre uma parceria.");
   const [error, setError] = useState<string | null>(null);
   const [lastSearch, setLastSearch] = useState({ query: "", location: "" });
@@ -59,20 +60,38 @@ export default function Home() {
   };
 
   const startCampaign = () => {
-    const selectedLeads = leads.filter((l: Lead) => selectedIds.includes(l.id));
-    if (selectedLeads.length === 0) return;
-
-    selectedLeads.forEach((lead: Lead, index: number) => {
-      // Pequeno delay fake ou lógica de abertura sequencial
-      setTimeout(() => {
-        const text = campaignMessage.replace(/{EMPRESA}/g, lead.companyName);
-        const cleanPhone = lead.phone?.replace(/\D/g, '');
-        if (cleanPhone) {
-          window.open(`https://web.whatsapp.com/send?phone=${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}&text=${encodeURIComponent(text)}`, '_blank');
-        }
-      }, index * 1000); // Abre abas com intervalo de 1s para não travar
-    });
+    if (selectedIds.length === 0) return;
+    setCampaignIndex(0);
+    sendCurrentCampaignLead(0);
   };
+
+  const sendCurrentCampaignLead = (index: number) => {
+    const selectedLeads = leads.filter((l: Lead) => selectedIds.includes(l.id));
+    const lead = selectedLeads[index];
+    if (!lead || !lead.phone) return;
+
+    const text = campaignMessage.replace(/{EMPRESA}/g, lead.companyName);
+    const cleanPhone = lead.phone.replace(/\D/g, '');
+    window.open(`https://web.whatsapp.com/send?phone=${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}&text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  const nextCampaignLead = () => {
+    if (campaignIndex === null) return;
+    const nextIndex = campaignIndex + 1;
+    if (nextIndex < selectedIds.length) {
+      setCampaignIndex(nextIndex);
+      sendCurrentCampaignLead(nextIndex);
+    } else {
+      setCampaignIndex(null);
+    }
+  };
+
+  async function handleEnrich(id: string, website: string) {
+    const data = await enrichLeadData(id, website);
+    if (data) {
+      setLeads((prev: Lead[]) => prev.map((l: Lead) => l.id === id ? { ...l, phone: data.phone, email: data.email || l.email, status: 'Qualificado' } : l));
+    }
+  }
 
   const handleLoadMore = async () => {
     if (!lastSearch.query) return;
@@ -167,12 +186,36 @@ export default function Home() {
                   <h3 className="text-xl font-black text-emerald-400 uppercase italic">Campanha Billionaire</h3>
                   <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">{selectedIds.length} leads selecionados para ataque</p>
                 </div>
-                <Button 
-                  onClick={startCampaign}
-                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black uppercase text-sm px-10 h-14 rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.3)] transition-all hover:scale-105"
-                >
-                  Iniciar Disparos em Massa 🚀
-                </Button>
+                
+                {campaignIndex !== null ? (
+                  <div className="flex items-center gap-4 bg-slate-900/80 p-4 rounded-2xl border border-emerald-500/30">
+                    <div className="text-right">
+                      <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">PROGRESSO</p>
+                      <p className="text-sm font-bold text-white">{campaignIndex + 1} de {selectedIds.length}</p>
+                    </div>
+                    <Button 
+                      onClick={nextCampaignLead}
+                      className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black uppercase text-xs px-6 h-10 rounded-lg shadow-lg"
+                    >
+                      Próximo Alvo <FastForward className="ml-2 h-4 w-4" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => setCampaignIndex(null)}
+                      className="text-slate-500 hover:text-white text-[10px] uppercase font-bold"
+                    >
+                      Parar
+                    </Button>
+                  </div>
+                ) : (
+                  <Button 
+                    onClick={startCampaign}
+                    className="bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black uppercase text-sm px-10 h-14 rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.3)] transition-all hover:scale-105 flex items-center gap-2"
+                  >
+                    <PlayCircle className="h-5 w-5" />
+                    Iniciar Sequência de Ataque 🚀
+                  </Button>
+                )}
               </div>
               
               <div className="space-y-3">
@@ -202,6 +245,7 @@ export default function Home() {
           <ResultsTable 
             leads={leads} 
             onUpdateStatus={handleUpdateStatus} 
+            onEnrich={handleEnrich}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelect}
             onToggleAll={toggleSelectAll}
