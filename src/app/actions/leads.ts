@@ -102,7 +102,7 @@ export async function getLeadsBySearch(query: string, location: string, page: nu
   try {
     const cleanKey = apiKey.trim();
     const modelName = "gemini-2.5-flash";
-    const apiVer = "v1beta"; // v1beta é necessário para Grounding
+    const apiVer = "v1beta"; 
 
     try {
       const geminiUrl = `https://generativelanguage.googleapis.com/${apiVer}/models/${modelName}:generateContent?key=${cleanKey}`;
@@ -113,35 +113,32 @@ export async function getLeadsBySearch(query: string, location: string, page: nu
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           contents: [{ parts: [{ text: prompt }] }],
-          tools: [{ google_search: {} }] // Ativa a busca real no Google
-        })
+          tools: [{ google_search: {} }] 
+        }),
+        signal: AbortSignal.timeout(60000) // 1 minuto de timeout para busca profunda
       });
 
       const data = await response.json();
       
       if (response.ok && !data.error) {
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        const text = data.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text || "";
+        const cleanJson = text.replace(/```json|```|\[|\]/g, (m) => m === "[" || m === "]" ? m : "");
         const jsonMatch = text.match(/\[[\s\S]*\]/);
+        
         if (jsonMatch) {
-          const leads = JSON.parse(jsonMatch[0]);
-          console.log(`[Billionaire Maps] Sucesso! ${leads.length} leads extraídos.`);
-          return leads.map((l: any) => ({ ...l, id: crypto.randomUUID(), status: 'Pendente' as const }));
+          try {
+            const leads = JSON.parse(jsonMatch[0]);
+            console.log(`[Billionaire Maps] Sucesso! ${leads.length} leads de alta fidelidade.`);
+            return leads.map((l: any) => ({ ...l, id: crypto.randomUUID(), status: 'Pendente' as const }));
+          } catch (e) {
+            console.warn("[Gemini JSON Parse Error]", e);
+          }
         }
       } else {
-        console.error("[Gemini Error]", data.error);
-        // Fallback sem tools se o grounding falhar por algum motivo de quota/auth
-        const fallbackRes = await fetch(geminiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-        });
-        const fallbackData = await fallbackRes.json();
-        const text = fallbackData.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        const jsonMatch = text.match(/\[[\s\S]*\]/);
-        if (jsonMatch) return JSON.parse(jsonMatch[0]).map((l: any) => ({ ...l, id: crypto.randomUUID(), status: 'Pendente' as const }));
+        console.error("[Gemini API Error]", data.error || "Unknown Error");
       }
     } catch (e) {
-      console.error("[Billionaire Maps Critical Error]", e);
+      console.error("[Billionaire Maps Logic Error]", e);
     }
   } catch (error: any) { console.error("[Billionaire Shadow Error]", error); }
 
@@ -150,17 +147,19 @@ export async function getLeadsBySearch(query: string, location: string, page: nu
   const $ = cheerio.load(rawHtml);
   const manualLeads: any[] = [];
   
-  $('.result, .b_algo, .g').each((i: number, el: any) => {
-    if (i >= 15) return;
-    const name = $(el).find('h2, .result__title, h3').first().text().trim();
-    const link = $(el).find('a').first().attr('href') || "";
-    const snippet = $(el).find('.result__snippet, .b_caption, .VwiC3b').text();
+  // Seletores expandidos para Bing, DDG e Google
+  $('.result, .b_algo, .g, .MjjYud, .algo-sr').each((i: number, el: any) => {
+    if (manualLeads.length >= 15) return;
     
-    if (name && name.length > 3) {
+    const name = $(el).find('h2, .result__title, h3, .vv4Zsc').first().text().trim();
+    const link = $(el).find('a').first().attr('href') || "";
+    const snippet = $(el).find('.result__snippet, .b_caption, .VwiC3b, .L06Uu').text();
+    
+    if (name && name.length > 3 && !name.includes("Tradução") && !name.includes("Imagens")) {
       manualLeads.push({
         id: crypto.randomUUID(),
         companyName: name,
-        address: snippet.substring(0, 100) + "...",
+        address: snippet.length > 20 ? snippet.substring(0, 100) + "..." : "Consulte o site",
         website: link,
         phone: snippet.match(/(\d{2})?\s?9?\d{4}-?\d{4}/)?.[0] || "Consultar",
         email: snippet.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)?.[0] || null,
@@ -171,6 +170,7 @@ export async function getLeadsBySearch(query: string, location: string, page: nu
     }
   });
 
+  console.log(`[Fallback] Concluído com ${manualLeads.length} leads.`);
   return manualLeads;
 }
 
