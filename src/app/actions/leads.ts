@@ -60,23 +60,31 @@ export interface Lead {
   priority?: "Alta" | "Média" | "Baixa";
 }
 
+let cachedModel: string | null = null;
+
 async function discoverBestModel(apiKey: string) {
+  if (cachedModel) return cachedModel;
+  
   try {
     const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey.trim()}`;
     const res = await fetch(listUrl);
-    if (!res.ok) return "gemini-1.5-flash"; // Fallback padrão
-    const data = await res.json();
-    const models = data.models?.map((m: any) => m.name.split('/').pop()) || [];
-    console.log("[Gemini Discovery] Modelos disponíveis:", models.join(", "));
+    if (!res.ok) return "gemini-1.5-flash"; 
     
-    // Ordem de preferência: 2.5-flash -> 2.0-flash -> 1.5-flash -> qualquer flash -> qualquer pro
-    if (models.includes("gemini-2.5-flash")) return "gemini-2.5-flash";
-    if (models.includes("gemini-2.0-flash")) return "gemini-2.0-flash";
-    const anyFlash = models.find((m: string) => m.includes("flash"));
-    if (anyFlash) return anyFlash;
-    const anyPro = models.find((m: string) => m.includes("pro"));
-    if (anyPro) return anyPro;
-    return models[0] || "gemini-1.5-flash";
+    const data = await res.json();
+    // Filtrar apenas modelos que suportam generateContent
+    const validModels = (data.models || [])
+      .filter((m: any) => m.supportedGenerationMethods?.includes("generateContent"))
+      .map((m: any) => m.name.split('/').pop());
+    
+    console.log("[Gemini Discovery] Modelos válidos para geração:", validModels.join(", "));
+    
+    // Prioridade total para o 2.5-flash (favorito do usuário)
+    if (validModels.includes("gemini-2.5-flash")) cachedModel = "gemini-2.5-flash";
+    else if (validModels.includes("gemini-2.0-flash")) cachedModel = "gemini-2.0-flash";
+    else if (validModels.includes("gemini-1.5-flash")) cachedModel = "gemini-1.5-flash";
+    else cachedModel = validModels[0] || "gemini-1.5-flash";
+    
+    return cachedModel;
   } catch (e) {
     return "gemini-1.5-flash";
   }
@@ -274,7 +282,7 @@ export async function enrichLeadData(id: string, website: string | null, instagr
         const apiKey = process.env.GOOGLE_AI_STUDIO_KEY!;
         const bestModel = await discoverBestModel(apiKey);
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: bestModel });
+        const model = genAI.getGenerativeModel({ model: bestModel }, { apiVersion: 'v1beta' });
         const prompt = `Extraia o WHATSAPP/TELEFONE deste snippet de perfil do Instagram: ${igSearchHtml.substring(0, 5000)}. Retorne APENAS JSON: {"phone": "..."}`;
         const result = await model.generateContent(prompt);
         const igData = JSON.parse(result.response.text().replace(/```json|```/g, ""));
