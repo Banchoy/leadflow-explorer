@@ -240,13 +240,13 @@ export async function enrichLeadData(id: string, website: string | null, instagr
   // 1. Tentar Varredura no Website (se existir)
   if (website && website.startsWith('http')) {
     try {
-      console.log(`[Ghost Scraper] Varrendo Website: ${website} (Timeout: 15s)`);
+      console.log(`[Ghost Scraper] Tentativa Direta: ${website} (Timeout: 15s)`);
       const response = await fetch(website, {
         headers: { 
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
         },
-        signal: AbortSignal.timeout(15000), // Previne ETIMEDOUT travando a Vercel
+        signal: AbortSignal.timeout(15000),
         next: { revalidate: 3600 }
       });
       
@@ -259,14 +259,45 @@ export async function enrichLeadData(id: string, website: string | null, instagr
         const apiKey = process.env.GOOGLE_AI_STUDIO_KEY!;
         const bestModel = await discoverBestModel(apiKey);
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: bestModel });
+        const model = genAI.getGenerativeModel({ model: bestModel }, { apiVersion: 'v1beta' });
 
         const prompt = `Analise o texto do site e encontre: 1. WhatsApp/Telefone, 2. Email, 3. Instagram. Texto: ${cleanText}. Retorne APENAS JSON: {"phone": "...", "email": "...", "instagram": "..."}`;
         const result = await model.generateContent(prompt);
         foundData = JSON.parse(result.response.text().replace(/```json|```/g, ""));
+      } else {
+        throw new Error(`Status ${response.status}`);
       }
     } catch (e: any) { 
-      console.warn(`[Ghost Scraper] Alvo ${website} lento ou bloqueado: ${e.message}`); 
+      console.log(`[Ghost Scraper] Caminho Direto falhou para ${website}. Ativando Ghost Protocol (Grounding Bypass)...`);
+      
+      // CAMINHO 2: Grounding Bypass (Usa o Google para "entrar" no site por nós)
+      try {
+        const apiKey = process.env.GOOGLE_AI_STUDIO_KEY!;
+        const modelName = await discoverBestModel(apiKey);
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+        
+        const groundingPrompt = `Encontre o WhatsApp, telefone de contato, email e instagram oficial da empresa no site: ${website}. FOCO TOTAL NO WHATSAPP COM +55. Retorne APENAS JSON: {"phone": "...", "email": "...", "instagram": "..."}`;
+        
+        const res = await fetch(geminiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: groundingPrompt }] }],
+            tools: [{ google_search: {} }]
+          }),
+          signal: AbortSignal.timeout(45000) // Timeout maior para Grounding de bypass
+        });
+        
+        const data = await res.json();
+        const text = data.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text || "";
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          foundData = JSON.parse(jsonMatch[0]);
+          console.log(`[Ghost Scraper] Ghost Protocol sucesso! Dados recuperados via Grounding.`);
+        }
+      } catch (groundingError) {
+        console.error("[Ghost Scraper] Ghost Protocol também falhou ou deu timeout.", groundingError);
+      }
     }
   }
 
