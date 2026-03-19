@@ -85,50 +85,66 @@ export async function getLeadsBySearch(query: string, location: string, page: nu
   }
 
   const prompt = `
-    CONTEXTO: Robô de Prospecção de Elite (Billionaire Shadow Mode).
-    OBJETIVO: Extrair leads da busca por "${query}" em "${location}".
+    CONTEXTO: Robô de Prospecção de Elite (Billionaire Maps Mode).
+    OBJETIVO: Localizar empresas do nicho "${query}" em "${location}" usando o GOOGLE MAPS / GOOGLE MEU NEGÓCIO.
     
     INSTRUÇÕES:
-    1. Leia o HTML e extraia até 15 empresas.
-    2. Foque em: Nome, Endereço, Website, Telefone/WhatsApp (FORMATO: +55...), Email, Instagram e Facebook.
-    3. REGRAS DE REDES SOCIAIS: Extraia o link do Instagram/Facebook APENAS se ele aparecer claramente no texto (ex: instagram.com/usuário). NÃO tente adivinhar ou criar links baseados no nome da empresa. Se não tiver certeza, deixe o campo vazio.
-    4. Se o WhatsApp não estiver claro, extraia o telefone fixo ou celular padrão.
-    5. Retorne APENAS o array JSON, sem texto explicativo.
+    1. Use a ferramenta de busca para varrer o Google Maps na região solicitada.
+    2. Extraia até 15 empresas reais com dados atualizados.
+    3. Foque em: Nome, Endereço Completo, Website Oficial, Telefone/WhatsApp (FORMATO: +55...), Email e Instagram.
+    4. REGRAS DE REDES SOCIAIS: Extraia o link do Instagram/Facebook APENAS se ele for oficial.
+    5. Priorize leads que possuem telefone e site.
 
     JSON FORMAT:
     [{"companyName": "...", "address": "...", "website": "...", "phone": "...", "email": "...", "instagram": "...", "facebook": "...", "status": "Pendente"}]
-    
-    HTML DA BUSCA:
-    ${rawHtml.substring(0, 25000)}
   `;
 
   try {
     const cleanKey = apiKey.trim();
     console.log(`[Gemini] Usando modelo fixo: gemini-1.5-flash`);
     
-    // 2. Tentar as combinações de API (v1beta e v1)
-    const apiVersions = ["v1beta", "v1"];
-    const modelName = "gemini-1.5-flash";
+    const cleanKey = apiKey.trim();
+    const modelName = "gemini-2.5-flash";
+    const apiVer = "v1beta"; // v1beta é necessário para Grounding
 
-    for (const apiVer of apiVersions) {
-      try {
-        const geminiUrl = `https://generativelanguage.googleapis.com/${apiVer}/models/${modelName}:generateContent?key=${cleanKey}`;
-        const response = await fetch(geminiUrl, {
+    try {
+      const geminiUrl = `https://generativelanguage.googleapis.com/${apiVer}/models/${modelName}:generateContent?key=${cleanKey}`;
+      console.log(`[Billionaire Maps] Ativando ${modelName} com Google Search Grounding...`);
+      
+      const response = await fetch(geminiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          contents: [{ parts: [{ text: prompt }] }],
+          tools: [{ google_search: {} }] // Ativa a busca real no Google
+        })
+      });
+
+      const data = await response.json();
+      
+      if (response.ok && !data.error) {
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        const jsonMatch = text.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          const leads = JSON.parse(jsonMatch[0]);
+          console.log(`[Billionaire Maps] Sucesso! ${leads.length} leads extraídos.`);
+          return leads.map((l: any) => ({ ...l, id: crypto.randomUUID(), status: 'Pendente' as const }));
+        }
+      } else {
+        console.error("[Gemini Error]", data.error);
+        // Fallback sem tools se o grounding falhar por algum motivo de quota/auth
+        const fallbackRes = await fetch(geminiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
-
-        const data = await response.json();
-        if (response.ok && !data.error) {
-          const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-          const jsonMatch = text.match(/\[[\s\S]*\]/);
-          if (jsonMatch) {
-            const leads = JSON.parse(jsonMatch[0]);
-            return leads.map((l: any) => ({ ...l, id: crypto.randomUUID(), status: 'Pendente' as const }));
-          }
-        }
-      } catch (e) { }
+        const fallbackData = await fallbackRes.json();
+        const text = fallbackData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        const jsonMatch = text.match(/\[[\s\S]*\]/);
+        if (jsonMatch) return JSON.parse(jsonMatch[0]).map((l: any) => ({ ...l, id: crypto.randomUUID(), status: 'Pendente' as const }));
+      }
+    } catch (e) {
+      console.error("[Billionaire Maps Critical Error]", e);
     }
   } catch (error: any) { console.error("[Billionaire Shadow Error]", error); }
 
