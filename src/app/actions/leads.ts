@@ -101,9 +101,6 @@ export async function getLeadsBySearch(query: string, location: string, page: nu
 
   try {
     const cleanKey = apiKey.trim();
-    console.log(`[Gemini] Usando modelo fixo: gemini-1.5-flash`);
-    
-    const cleanKey = apiKey.trim();
     const modelName = "gemini-2.5-flash";
     const apiVer = "v1beta"; // v1beta é necessário para Grounding
 
