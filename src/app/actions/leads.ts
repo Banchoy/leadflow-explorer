@@ -142,42 +142,56 @@ export async function getLeadsBySearch(query: string, location: string, page: nu
   } catch (error: any) { console.error("[Billionaire Shadow Error]", error); }
 
   // 3. FALLBACK "ULTRA-RESILIENT": Scraper Baseado em Estrutura (Links + Blocos)
-  console.log("[Fallback] Iniciando Extração Ultra-Resiliente (Sem dependência de CSS)...");
+  console.log("[Fallback] Iniciando Extração Hyper-Resiliente (Decodificando fontes)...");
   const $ = cheerio.load(rawHtml);
   const manualLeads: any[] = [];
   
-  // Estratégia: Procurar por blocos que contenham links externos (potenciais sites de empresas)
+  // Estratégia: Procurar por blocos que contenham links (incluindo redirecionamentos)
   $('a').each((i: number, el: any) => {
-    if (manualLeads.length >= 15) return;
+    if (manualLeads.length >= 20) return;
     
-    const url = $(el).attr('href') || "";
-    // Ignorar links internos de grandes portais
-    if (!url.startsWith('http') || url.includes('google.com') || url.includes('bing.com') || url.includes('duckduckgo.com') || url.includes('microsoft.com')) return;
+    let url = $(el).attr('href') || "";
+    if (!url || url.length < 10) return;
+
+    // Decodificar URLs de redirecionamento (Bing/Google/DDG)
+    if (url.includes('google.com/url?q=') || url.includes('bing.com/ck/a?') || url.includes('duckduckgo.com/l/?')) {
+      try {
+        const decodedUrl = decodeURIComponent(url.split('q=')[1]?.split('&')[0] || url.split('uddg=')[1]?.split('&')[0] || "");
+        if (decodedUrl.startsWith('http')) url = decodedUrl;
+      } catch (e) {}
+    }
+
+    // Ignorar lixo e domínios de sistema
+    const blacklist = ['google.com', 'bing.com', 'duckduckgo', 'microsoft', 'w3.org', 'wikipedia', 'youtube', 'facebook.com/sharer', 'twitter.com', 'linkedin.com/share'];
+    if (!url.startsWith('http') || blacklist.some(b => url.includes(b))) return;
     
-    // Pegar o container pai mais próximo que pareça um resultado de busca
+    // Pegar o container mais expressivo (h2 ou h3 próximo)
     const container = $(el).closest('div, li, section');
-    const text = container.text().trim();
+    const text = container.text().trim().replace(/\s+/g, ' ');
     const name = $(el).text().trim() || container.find('h2, h3').first().text().trim();
     
-    if (name && name.length > 3 && url.length > 5 && text.length > 50) {
-      // Evitar duplicatas por URL
+    if (name && name.length > 3 && text.length > 50) {
       if (manualLeads.some(l => l.website === url)) return;
 
       manualLeads.push({
         id: crypto.randomUUID(),
-        companyName: name.split(' - ')[0].split(' | ')[0].trim(),
-        address: text.substring(0, 150).replace(/\n/g, ' ') + "...",
+        companyName: name.split(' - ')[0].split(' | ')[0].substring(0, 50).trim(),
+        address: text.substring(0, 150) + "...",
         website: url,
-        phone: text.match(/(\d{2})?\s?9?\d{4}-?\d{4}/)?.[0] || "Consultar Website",
+        phone: text.match(/(\d{2})?\s?9?\d{4}-?\d{4}/)?.[0] || "Ver Site",
         email: text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)?.[0] || null,
-        instagram: text.includes("instagram.com") ? "Ver no site" : null,
+        instagram: text.toLowerCase().includes("instagram.com") ? "Ver no site" : null,
         status: 'Pendente' as const,
         priority: "Média" as const
       });
     }
   });
 
-  console.log(`[Fallback] Concluído! ${manualLeads.length} leads capturados via varredura estrutural.`);
+  if (manualLeads.length > 0) {
+    console.log(`[Fallback] Vitória! ${manualLeads.length} leads capturados via varredura profunda.`);
+  } else {
+    console.warn("[Fallback] Nenhuma empresa encontrada no HTML. Verifique se o termo de busca não está sendo bloqueado.");
+  }
   return manualLeads;
 }
 
