@@ -232,26 +232,34 @@ export async function enrichLeadData(id: string, website: string | null, instagr
   // 1. Tentar Varredura no Website (se existir)
   if (website && website.startsWith('http')) {
     try {
-      console.log(`[Ghost Scraper] Varrendo Website: ${website}`);
+      console.log(`[Ghost Scraper] Varrendo Website: ${website} (Timeout: 15s)`);
       const response = await fetch(website, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+        headers: { 
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
+        },
+        signal: AbortSignal.timeout(15000), // Previne ETIMEDOUT travando a Vercel
         next: { revalidate: 3600 }
       });
       
       if (response.ok) {
         const html = await response.text();
         const $ = cheerio.load(html);
-        $('script, style, nav, footer').remove();
-        const cleanText = $('body').text().slice(0, 8000);
+        $('script, style, nav, footer, iframe, noscript').remove();
+        const cleanText = $('body').text().replace(/\s+/g, ' ').slice(0, 10000);
 
-        const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_STUDIO_KEY!);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const apiKey = process.env.GOOGLE_AI_STUDIO_KEY!;
+        const bestModel = await discoverBestModel(apiKey);
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: bestModel });
 
         const prompt = `Analise o texto do site e encontre: 1. WhatsApp/Telefone, 2. Email, 3. Instagram. Texto: ${cleanText}. Retorne APENAS JSON: {"phone": "...", "email": "...", "instagram": "..."}`;
         const result = await model.generateContent(prompt);
         foundData = JSON.parse(result.response.text().replace(/```json|```/g, ""));
       }
-    } catch (e) { console.error("[Ghost Scraper Website Error]", e); }
+    } catch (e: any) { 
+      console.warn(`[Ghost Scraper] Alvo ${website} lento ou bloqueado: ${e.message}`); 
+    }
   }
 
   // 2. Tentar Varredura no Instagram (se o site falhou ou não tinha WhatsApp)
@@ -263,8 +271,10 @@ export async function enrichLeadData(id: string, website: string | null, instagr
       const igSearchHtml = await fetchSearchAlternative(`instagram ${igHandle} whatsapp telefone contato`, "");
       
       if (igSearchHtml) {
-        const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_STUDIO_KEY!);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const apiKey = process.env.GOOGLE_AI_STUDIO_KEY!;
+        const bestModel = await discoverBestModel(apiKey);
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: bestModel });
         const prompt = `Extraia o WHATSAPP/TELEFONE deste snippet de perfil do Instagram: ${igSearchHtml.substring(0, 5000)}. Retorne APENAS JSON: {"phone": "..."}`;
         const result = await model.generateContent(prompt);
         const igData = JSON.parse(result.response.text().replace(/```json|```/g, ""));
