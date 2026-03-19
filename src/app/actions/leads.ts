@@ -90,13 +90,13 @@ export async function getLeadsBySearch(query: string, location: string, page: nu
     
     INSTRUÇÕES:
     1. Leia o HTML e extraia até 15 empresas.
-    2. Foque em: Nome, Endereço, Website, Telefone/WhatsApp (FORMATO: +55...), Email e Instagram.
-    3. Se o WhatsApp não estiver claro, extraia o telefone fixo ou celular padrão.
-    4. Extraia o link do Instagram se disponível (ex: instagram.com/usuario).
+    2. Foque em: Nome, Endereço, Website, Telefone/WhatsApp (FORMATO: +55...), Email, Instagram e Facebook.
+    3. REGRAS DE REDES SOCIAIS: Extraia o link do Instagram/Facebook APENAS se ele aparecer claramente no texto (ex: instagram.com/usuário). NÃO tente adivinhar ou criar links baseados no nome da empresa. Se não tiver certeza, deixe o campo vazio.
+    4. Se o WhatsApp não estiver claro, extraia o telefone fixo ou celular padrão.
     5. Retorne APENAS o array JSON, sem texto explicativo.
 
     JSON FORMAT:
-    [{"companyName": "...", "address": "...", "website": "...", "phone": "...", "email": "...", "instagram": "...", "status": "Pendente"}]
+    [{"companyName": "...", "address": "...", "website": "...", "phone": "...", "email": "...", "instagram": "...", "facebook": "...", "status": "Pendente"}]
     
     HTML DA BUSCA:
     ${rawHtml.substring(0, 25000)}
