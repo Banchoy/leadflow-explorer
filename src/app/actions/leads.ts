@@ -104,32 +104,15 @@ export async function getLeadsBySearch(query: string, location: string, page: nu
 
   try {
     const cleanKey = apiKey.trim();
-    console.log(`[Gemini] Diagnóstico: Validando chave ${cleanKey.substring(0, 7)}...`);
-
-    // 1. Tentar descobrir modelos disponíveis para esta chave
-    let modelName = "gemini-1.5-flash";
-    try {
-      const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${cleanKey}`;
-      const listRes = await fetch(listUrl);
-      if (listRes.ok) {
-        const listData = await listRes.json();
-        const availableModels = listData.models?.map((m: any) => m.name.split('/').pop()) || [];
-        console.log("[Gemini] Modelos disponíveis:", availableModels.join(", "));
-        if (availableModels.length > 0) {
-          modelName = availableModels.find((m: string) => m.includes("flash")) || availableModels[0];
-        }
-      }
-    } catch (e) {
-      console.warn("[Gemini] Erro no Discovery de modelos.");
-    }
-
-    // 2. Tentar as combinações de API
+    console.log(`[Gemini] Usando modelo fixo: gemini-1.5-flash`);
+    
+    // 2. Tentar as combinações de API (v1beta e v1)
     const apiVersions = ["v1beta", "v1"];
+    const modelName = "gemini-1.5-flash";
+
     for (const apiVer of apiVersions) {
       try {
         const geminiUrl = `https://generativelanguage.googleapis.com/${apiVer}/models/${modelName}:generateContent?key=${cleanKey}`;
-        console.log(`[Gemini] Chamando ${apiVer}/${modelName}...`);
-        
         const response = await fetch(geminiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -142,7 +125,6 @@ export async function getLeadsBySearch(query: string, location: string, page: nu
           const jsonMatch = text.match(/\[[\s\S]*\]/);
           if (jsonMatch) {
             const leads = JSON.parse(jsonMatch[0]);
-            console.log(`[Gemini] Sucesso com ${modelName}!`);
             return leads.map((l: any) => ({ ...l, id: crypto.randomUUID(), status: 'Pendente' as const }));
           }
         }
