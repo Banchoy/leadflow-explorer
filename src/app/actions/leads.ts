@@ -122,7 +122,6 @@ export async function getLeadsBySearch(query: string, location: string, page: nu
       
       if (response.ok && !data.error) {
         const text = data.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text || "";
-        const cleanJson = text.replace(/```json|```|\[|\]/g, (m) => m === "[" || m === "]" ? m : "");
         const jsonMatch = text.match(/\[[\s\S]*\]/);
         
         if (jsonMatch) {
