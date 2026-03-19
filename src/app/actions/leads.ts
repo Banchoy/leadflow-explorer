@@ -141,35 +141,43 @@ export async function getLeadsBySearch(query: string, location: string, page: nu
     }
   } catch (error: any) { console.error("[Billionaire Shadow Error]", error); }
 
-  // 3. FALLBACK FINAL: Scraper Manual (Garante que nunca venha vazio se houver HTML)
-  console.log("[Fallback] Iniciando extração manual do HTML...");
+  // 3. FALLBACK "ULTRA-RESILIENT": Scraper Baseado em Estrutura (Links + Blocos)
+  console.log("[Fallback] Iniciando Extração Ultra-Resiliente (Sem dependência de CSS)...");
   const $ = cheerio.load(rawHtml);
   const manualLeads: any[] = [];
   
-  // Seletores expandidos para Bing, DDG e Google
-  $('.result, .b_algo, .g, .MjjYud, .algo-sr').each((i: number, el: any) => {
+  // Estratégia: Procurar por blocos que contenham links externos (potenciais sites de empresas)
+  $('a').each((i: number, el: any) => {
     if (manualLeads.length >= 15) return;
     
-    const name = $(el).find('h2, .result__title, h3, .vv4Zsc').first().text().trim();
-    const link = $(el).find('a').first().attr('href') || "";
-    const snippet = $(el).find('.result__snippet, .b_caption, .VwiC3b, .L06Uu').text();
+    const url = $(el).attr('href') || "";
+    // Ignorar links internos de grandes portais
+    if (!url.startsWith('http') || url.includes('google.com') || url.includes('bing.com') || url.includes('duckduckgo.com') || url.includes('microsoft.com')) return;
     
-    if (name && name.length > 3 && !name.includes("Tradução") && !name.includes("Imagens")) {
+    // Pegar o container pai mais próximo que pareça um resultado de busca
+    const container = $(el).closest('div, li, section');
+    const text = container.text().trim();
+    const name = $(el).text().trim() || container.find('h2, h3').first().text().trim();
+    
+    if (name && name.length > 3 && url.length > 5 && text.length > 50) {
+      // Evitar duplicatas por URL
+      if (manualLeads.some(l => l.website === url)) return;
+
       manualLeads.push({
         id: crypto.randomUUID(),
-        companyName: name,
-        address: snippet.length > 20 ? snippet.substring(0, 100) + "..." : "Consulte o site",
-        website: link,
-        phone: snippet.match(/(\d{2})?\s?9?\d{4}-?\d{4}/)?.[0] || "Consultar",
-        email: snippet.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)?.[0] || null,
-        instagram: snippet.includes("instagram.com") ? "Ver no site" : null,
+        companyName: name.split(' - ')[0].split(' | ')[0].trim(),
+        address: text.substring(0, 150).replace(/\n/g, ' ') + "...",
+        website: url,
+        phone: text.match(/(\d{2})?\s?9?\d{4}-?\d{4}/)?.[0] || "Consultar Website",
+        email: text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)?.[0] || null,
+        instagram: text.includes("instagram.com") ? "Ver no site" : null,
         status: 'Pendente' as const,
         priority: "Média" as const
       });
     }
   });
 
-  console.log(`[Fallback] Concluído com ${manualLeads.length} leads.`);
+  console.log(`[Fallback] Concluído! ${manualLeads.length} leads capturados via varredura estrutural.`);
   return manualLeads;
 }
 
