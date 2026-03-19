@@ -8,7 +8,7 @@ import { Lead } from "@/app/page";
 interface ResultsTableProps {
   leads: Lead[];
   onUpdateStatus: (id: string, status: Lead['status']) => void;
-  onEnrich: (id: string, website: string) => Promise<void>;
+  onEnrich: (id: string, website: string | null, instagram: string | null) => Promise<void>;
   selectedIds: string[];
   onToggleSelect: (id: string) => void;
   onToggleAll: () => void;
@@ -154,13 +154,13 @@ export function ResultsTable({ leads, onUpdateStatus, onEnrich, selectedIds, onT
                       </Button>
                     </div>
 
-                    {lead.website && (
+                    {(lead.website || lead.instagram) && (
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={async () => {
                           setEnrichingId(lead.id);
-                          await onEnrich(lead.id, lead.website!);
+                          await onEnrich(lead.id, lead.website || null, lead.instagram || null);
                           setEnrichingId(null);
                         }}
                         disabled={enrichingId === lead.id}

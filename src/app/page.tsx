@@ -77,12 +77,9 @@ export default function Home() {
     // Configuração do Popup
     const features = "width=800,height=900,status=no,resizable=yes,scrollbars=yes";
     
-    if (isInitial) {
-      window.open(url, 'wa-campaign', features);
-    } else {
-      // Reutiliza a mesma janela chamada 'wa-campaign'
-      window.open(url, 'wa-campaign');
-    }
+    // Força a atualização da janela 'wa-campaign'
+    const waPopup = window.open(url, 'wa-campaign', isInitial ? features : undefined);
+    if (waPopup) waPopup.focus();
   };
 
   const nextCampaignLead = () => {
@@ -90,14 +87,15 @@ export default function Home() {
     const nextIndex = campaignIndex + 1;
     if (nextIndex < selectedIds.length) {
       setCampaignIndex(nextIndex);
-      sendCurrentCampaignLead(nextIndex);
+      // Pequeno delay para garantir que o navegador processe o foco
+      setTimeout(() => sendCurrentCampaignLead(nextIndex), 100);
     } else {
       setCampaignIndex(null);
     }
   };
 
-  async function handleEnrich(id: string, website: string) {
-    const data = await enrichLeadData(id, website);
+  async function handleEnrich(id: string, website: string | null, instagram: string | null) {
+    const data = await enrichLeadData(id, website, instagram);
     if (data) {
       setLeads((prev: Lead[]) => prev.map((l: Lead) => l.id === id ? { 
         ...l, 

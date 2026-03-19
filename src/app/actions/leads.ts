@@ -190,57 +190,65 @@ export async function updateLeadStatus(id: string, status: 'Pendente' | 'Contata
     .returning();
 }
 
-export async function enrichLeadData(id: string, website: string) {
-  if (!website || !website.startsWith('http')) return null;
+export async function enrichLeadData(id: string, website: string | null, instagram: string | null) {
+  let foundData: any = null;
 
-  try {
-    console.log(`[Ghost Scraper] Iniciando varredura em: ${website}`);
-    const response = await fetch(website, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-      next: { revalidate: 3600 }
-    });
-    
-    if (!response.ok) return null;
-    const html = await response.text();
-    const $ = cheerio.load(html);
-    
-    // Remove scripts e styles para limpar o texto
-    $('script, style, nav, footer').remove();
-    const cleanText = $('body').text().slice(0, 10000); // 10k chars iniciais
+  // 1. Tentar Varredura no Website (se existir)
+  if (website && website.startsWith('http')) {
+    try {
+      console.log(`[Ghost Scraper] Varrendo Website: ${website}`);
+      const response = await fetch(website, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+        next: { revalidate: 3600 }
+      });
+      
+      if (response.ok) {
+        const html = await response.text();
+        const $ = cheerio.load(html);
+        $('script, style, nav, footer').remove();
+        const cleanText = $('body').text().slice(0, 8000);
 
-    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_STUDIO_KEY!);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_STUDIO_KEY!);
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    const prompt = `Analise o texto extraído do site oficial da empresa e identifique dados de contato REAIS.
-    Texto: ${cleanText}
-
-    OBJETIVO:
-    1. Encontrar o número de WhatsApp (prioridade).
-    2. Encontrar o link do INSTAGRAM oficial da empresa.
-    3. Encontrar o link do FACEBOOK oficial da empresa.
-    4. Encontrar o EMAIL de contato.
-
-    REGRAS:
-    - Retorne APENAS um JSON: {"phone": "número com DDD", "email": "email", "instagram": "url completa", "facebook": "url completa", "foundNewData": true/false}
-    - Se não encontrar algum campo, deixe null.`;
-
-    const result = await model.generateContent(prompt);
-    const data = JSON.parse(result.response.text().replace(/```json|```/g, ""));
-
-    if (data.phone || data.instagram || data.email) {
-      await db.update(leads)
-        .set({ 
-          phone: data.phone || undefined, 
-          email: data.email || null,
-          instagram: data.instagram || null,
-          status: 'Qualificado' 
-        })
-        .where(eq(leads.id, id));
-      return data;
-    }
-    return null;
-  } catch (error) {
-    console.error("[Ghost Scraper Error]", error);
-    return null;
+        const prompt = `Analise o texto do site e encontre: 1. WhatsApp/Telefone, 2. Email, 3. Instagram. Texto: ${cleanText}. Retorne APENAS JSON: {"phone": "...", "email": "...", "instagram": "..."}`;
+        const result = await model.generateContent(prompt);
+        foundData = JSON.parse(result.response.text().replace(/```json|```/g, ""));
+      }
+    } catch (e) { console.error("[Ghost Scraper Website Error]", e); }
   }
+
+  // 2. Tentar Varredura no Instagram (se o site falhou ou não tinha WhatsApp)
+  if ((!foundData?.phone) && instagram) {
+    try {
+      console.log(`[Ghost Scraper] Varrendo Instagram: ${instagram}`);
+      // Como não podemos fazer scrape direto do IG facilmente, usamos uma busca pública refinada
+      const igHandle = instagram.split('/').pop()?.replace('@', '');
+      const igSearchHtml = await fetchSearchAlternative(`instagram ${igHandle} whatsapp telefone contato`, "");
+      
+      if (igSearchHtml) {
+        const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_STUDIO_KEY!);
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `Extraia o WHATSAPP/TELEFONE deste snippet de perfil do Instagram: ${igSearchHtml.substring(0, 5000)}. Retorne APENAS JSON: {"phone": "..."}`;
+        const result = await model.generateContent(prompt);
+        const igData = JSON.parse(result.response.text().replace(/```json|```/g, ""));
+        if (igData.phone) {
+          foundData = { ...foundData, phone: igData.phone };
+        }
+      }
+    } catch (e) { console.error("[Ghost Scraper Instagram Error]", e); }
+  }
+
+  if (foundData && (foundData.phone || foundData.instagram || foundData.email)) {
+    await db.update(leads)
+      .set({ 
+        phone: foundData.phone || undefined, 
+        email: foundData.email || null,
+        instagram: foundData.instagram || instagram || null,
+        status: 'Qualificado' 
+      })
+      .where(eq(leads.id, id));
+    return foundData;
+  }
+  return null;
 }
