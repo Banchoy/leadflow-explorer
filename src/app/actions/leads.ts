@@ -60,33 +60,33 @@ export interface Lead {
   priority?: "Alta" | "Média" | "Baixa";
 }
 
-let cachedModel: string | null = null;
+let cachedModel: string = "gemini-1.5-flash"; 
+let isDiscovered = false;
 
-async function discoverBestModel(apiKey: string) {
-  if (cachedModel) return cachedModel;
+async function discoverBestModel(apiKey: string): Promise<string> {
+  if (isDiscovered) return cachedModel;
   
   try {
     const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey.trim()}`;
     const res = await fetch(listUrl);
-    if (!res.ok) return "gemini-1.5-flash"; 
+    if (!res.ok) return cachedModel; 
     
     const data = await res.json();
-    // Filtrar apenas modelos que suportam generateContent
     const validModels = (data.models || [])
       .filter((m: any) => m.supportedGenerationMethods?.includes("generateContent"))
       .map((m: any) => m.name.split('/').pop());
     
     console.log("[Gemini Discovery] Modelos válidos para geração:", validModels.join(", "));
     
-    // Prioridade total para o 2.5-flash (favorito do usuário)
     if (validModels.includes("gemini-2.5-flash")) cachedModel = "gemini-2.5-flash";
     else if (validModels.includes("gemini-2.0-flash")) cachedModel = "gemini-2.0-flash";
     else if (validModels.includes("gemini-1.5-flash")) cachedModel = "gemini-1.5-flash";
-    else cachedModel = validModels[0] || "gemini-1.5-flash";
+    else if (validModels.length > 0) cachedModel = validModels[0];
     
+    isDiscovered = true;
     return cachedModel;
   } catch (e) {
-    return "gemini-1.5-flash";
+    return cachedModel;
   }
 }
 
