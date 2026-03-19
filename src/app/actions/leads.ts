@@ -211,18 +211,28 @@ export async function enrichLeadData(id: string, website: string) {
     const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_STUDIO_KEY!);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    const prompt = `Analise o texto extraído do site da empresa e identifique o número de WhatsApp ou telefone de contato. 
+    const prompt = `Analise o texto extraído do site oficial da empresa e identifique dados de contato REAIS.
     Texto: ${cleanText}
-    Retorne APENAS um JSON: {"phone": "número com DDD", "email": "email se encontrar", "whatsappFound": true/false}`;
+
+    OBJETIVO:
+    1. Encontrar o número de WhatsApp (prioridade).
+    2. Encontrar o link do INSTAGRAM oficial da empresa.
+    3. Encontrar o link do FACEBOOK oficial da empresa.
+    4. Encontrar o EMAIL de contato.
+
+    REGRAS:
+    - Retorne APENAS um JSON: {"phone": "número com DDD", "email": "email", "instagram": "url completa", "facebook": "url completa", "foundNewData": true/false}
+    - Se não encontrar algum campo, deixe null.`;
 
     const result = await model.generateContent(prompt);
     const data = JSON.parse(result.response.text().replace(/```json|```/g, ""));
 
-    if (data.phone) {
+    if (data.phone || data.instagram || data.email) {
       await db.update(leads)
         .set({ 
-          phone: data.phone, 
+          phone: data.phone || undefined, 
           email: data.email || null,
+          instagram: data.instagram || null,
           status: 'Qualificado' 
         })
         .where(eq(leads.id, id));

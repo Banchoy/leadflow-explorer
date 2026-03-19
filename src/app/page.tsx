@@ -99,7 +99,13 @@ export default function Home() {
   async function handleEnrich(id: string, website: string) {
     const data = await enrichLeadData(id, website);
     if (data) {
-      setLeads((prev: Lead[]) => prev.map((l: Lead) => l.id === id ? { ...l, phone: data.phone, email: data.email || l.email, status: 'Qualificado' } : l));
+      setLeads((prev: Lead[]) => prev.map((l: Lead) => l.id === id ? { 
+        ...l, 
+        phone: data.phone || l.phone, 
+        instagram: data.instagram || l.instagram,
+        email: data.email || l.email, 
+        status: 'Qualificado' 
+      } : l));
     }
   }
 
