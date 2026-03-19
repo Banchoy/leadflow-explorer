@@ -184,8 +184,21 @@ export function ResultsTable({ leads, onUpdateStatus, onEnrich, selectedIds, onT
                     <Button
                       size="sm"
                       onClick={() => {
-                        onUpdateStatus(lead.id, 'Contatado');
-                        if (lead.phone) handleWhatsApp(lead.phone, lead.companyName);
+                        // Prioridade Total: Abrir WhatsApp primeiro carregar o popup
+                        if (lead.phone) {
+                          handleWhatsApp(lead.phone, lead.companyName);
+                        } else {
+                          // Caso não tenha telefone, abre busca direta pelo nome no WA
+                          const waUrl = `https://web.whatsapp.com/search?text=${encodeURIComponent(lead.companyName)}`;
+                          window.open(waUrl, 'wa-search', "width=800,height=900");
+                        }
+                        
+                        // Atualização de status em background (silenciosa)
+                        try {
+                          onUpdateStatus(lead.id, 'Contatado');
+                        } catch (e) {
+                          console.warn("[UI Sync Error] Falha ao atualizar status, mas popup aberto.", e);
+                        }
                       }}
                       className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold gap-2 shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all hover:scale-105 active:scale-95"
                     >

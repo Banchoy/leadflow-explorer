@@ -228,10 +228,15 @@ export async function saveLead(leadData: typeof leads.$inferInsert) {
 }
 
 export async function updateLeadStatus(id: string, status: 'Pendente' | 'Contatado' | 'Qualificado' | 'Desqualificado') {
-  return await db.update(leads)
-    .set({ status })
-    .where(eq(leads.id, id))
-    .returning();
+  try {
+    return await db.update(leads)
+      .set({ status })
+      .where(eq(leads.id, id))
+      .returning();
+  } catch (e) {
+    console.error(`[DB Update Error] Falha ao atualizar lead ${id}:`, e);
+    return null; // Falha silenciosa para não quebrar a UI
+  }
 }
 
 export async function enrichLeadData(id: string, website: string | null, instagram: string | null) {
@@ -325,14 +330,18 @@ export async function enrichLeadData(id: string, website: string | null, instagr
   }
 
   if (foundData && (foundData.phone || foundData.instagram || foundData.email)) {
-    await db.update(leads)
-      .set({ 
-        phone: foundData.phone || undefined, 
-        email: foundData.email || null,
-        instagram: foundData.instagram || instagram || null,
-        status: 'Qualificado' 
-      })
-      .where(eq(leads.id, id));
+    try {
+      await db.update(leads)
+        .set({ 
+          phone: foundData.phone || undefined, 
+          email: foundData.email || null,
+          instagram: foundData.instagram || instagram || null,
+          status: 'Qualificado' 
+        })
+        .where(eq(leads.id, id));
+    } catch (dbError) {
+      console.error("[Ghost Scraper DB Sync Error] Dados encontrados mas não salvos:", dbError);
+    }
     return foundData;
   }
   return null;
