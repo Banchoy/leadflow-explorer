@@ -123,6 +123,7 @@ export async function getLeadsBySearch(query: string, location: string, page: nu
     ${rawHtml.substring(0, 30000)}
   `;
 
+  try {
     const cleanKey = apiKey.trim();
     const modelName = await discoverBestModel(cleanKey);
     const apiVer = "v1beta";
@@ -158,7 +159,7 @@ export async function getLeadsBySearch(query: string, location: string, page: nu
     } catch (e) {
       console.error("[Billionaire Shadow Logic Error]", e);
     }
-  } catch (error: any) { console.error("[Billionaire Shadow Error]", error); }
+  } catch (error: any) { console.error("[Billionaire Shadow Outer Error]", error); }
 
   // 3. FALLBACK "ULTRA-RESILIENT": Scraper Baseado em Estrutura (Links + Blocos)
   console.log("[Fallback] Iniciando Extração Hyper-Resiliente (Decodificando fontes)...");
