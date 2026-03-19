@@ -85,59 +85,59 @@ export async function getLeadsBySearch(query: string, location: string, page: nu
   }
 
   const prompt = `
-    CONTEXTO: Robô de Prospecção de Elite (Billionaire Maps Mode).
-    OBJETIVO: Localizar empresas do nicho "${query}" em "${location}" usando o GOOGLE MAPS / GOOGLE MEU NEGÓCIO.
+    CONTEXTO: Robô de Prospecção de Elite (Billionaire Shadow Mode).
+    OBJETIVO: Extrair leads da busca por "${query}" em "${location}".
     
     INSTRUÇÕES:
-    1. Use a ferramenta de busca para varrer o Google Maps na região solicitada.
-    2. Extraia até 15 empresas reais com dados atualizados.
-    3. Foque em: Nome, Endereço Completo, Website Oficial, Telefone/WhatsApp (FORMATO: +55...), Email e Instagram.
-    4. REGRAS DE REDES SOCIAIS: Extraia o link do Instagram/Facebook APENAS se ele for oficial.
-    5. Priorize leads que possuem telefone e site.
+    1. Analise o HTML bruto fornecido e extraia até 20 empresas.
+    2. Foque em: Nome da Empresa, Endereço, Website Oficial, Telefone/WhatsApp (FORMATO: +55...), Email e Instagram.
+    3. REGRAS: Extraia apenas dados REAIS presentes no texto. Não invente links.
+    4. Formate como um array JSON puro.
 
     JSON FORMAT:
-    [{"companyName": "...", "address": "...", "website": "...", "phone": "...", "email": "...", "instagram": "...", "facebook": "...", "status": "Pendente"}]
+    [{"companyName": "...", "address": "...", "website": "...", "phone": "...", "email": "...", "instagram": "...", "status": "Pendente"}]
+    
+    HTML BRUTO PARA ANÁLISE:
+    ${rawHtml.substring(0, 30000)}
   `;
 
   try {
     const cleanKey = apiKey.trim();
-    const modelName = "gemini-2.5-flash";
+    const modelName = "gemini-1.5-flash"; // Retorno ao motor super rápido e estável
     const apiVer = "v1beta"; 
 
     try {
       const geminiUrl = `https://generativelanguage.googleapis.com/${apiVer}/models/${modelName}:generateContent?key=${cleanKey}`;
-      console.log(`[Billionaire Maps] Ativando ${modelName} com Google Search Grounding...`);
+      console.log(`[Billionaire Shadow] Restaurando motor ${modelName} (Modo Estável)...`);
       
       const response = await fetch(geminiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          contents: [{ parts: [{ text: prompt }] }],
-          tools: [{ google_search: {} }] 
-        }),
-        signal: AbortSignal.timeout(60000) // 1 minuto de timeout para busca profunda
+          contents: [{ parts: [{ text: prompt }] }]
+        })
       });
 
       const data = await response.json();
       
       if (response.ok && !data.error) {
-        const text = data.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text || "";
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
         const jsonMatch = text.match(/\[[\s\S]*\]/);
         
         if (jsonMatch) {
           try {
             const leads = JSON.parse(jsonMatch[0]);
-            console.log(`[Billionaire Maps] Sucesso! ${leads.length} leads de alta fidelidade.`);
+            console.log(`[Billionaire Shadow] Sucesso! ${leads.length} leads extraídos.`);
             return leads.map((l: any) => ({ ...l, id: crypto.randomUUID(), status: 'Pendente' as const }));
           } catch (e) {
-            console.warn("[Gemini JSON Parse Error]", e);
+            console.warn("[Shadow Parse Error]", e);
           }
         }
       } else {
         console.error("[Gemini API Error]", data.error || "Unknown Error");
       }
     } catch (e) {
-      console.error("[Billionaire Maps Logic Error]", e);
+      console.error("[Billionaire Shadow Logic Error]", e);
     }
   } catch (error: any) { console.error("[Billionaire Shadow Error]", error); }
 
