@@ -103,12 +103,12 @@ export async function getLeadsBySearch(query: string, location: string, page: nu
 
   try {
     const cleanKey = apiKey.trim();
-    const modelName = "gemini-1.5-flash"; // Retorno ao motor super rápido e estável
+    const modelName = "gemini-2.5-flash"; // Fixado conforme solicitado
     const apiVer = "v1beta"; 
 
     try {
       const geminiUrl = `https://generativelanguage.googleapis.com/${apiVer}/models/${modelName}:generateContent?key=${cleanKey}`;
-      console.log(`[Billionaire Shadow] Restaurando motor ${modelName} (Modo Estável)...`);
+      console.log(`[Billionaire Shadow] Utilizando motor ${modelName} (Modo Solicitado)...`);
       
       const response = await fetch(geminiUrl, {
         method: 'POST',
@@ -127,14 +127,14 @@ export async function getLeadsBySearch(query: string, location: string, page: nu
         if (jsonMatch) {
           try {
             const leads = JSON.parse(jsonMatch[0]);
-            console.log(`[Billionaire Shadow] Sucesso! ${leads.length} leads extraídos.`);
+            console.log(`[Billionaire Shadow] Sucesso com ${modelName}! ${leads.length} leads.`);
             return leads.map((l: any) => ({ ...l, id: crypto.randomUUID(), status: 'Pendente' as const }));
           } catch (e) {
             console.warn("[Shadow Parse Error]", e);
           }
         }
       } else {
-        console.error("[Gemini API Error]", data.error || "Unknown Error");
+        console.error("[Gemini API Error]", data.error);
       }
     } catch (e) {
       console.error("[Billionaire Shadow Logic Error]", e);
