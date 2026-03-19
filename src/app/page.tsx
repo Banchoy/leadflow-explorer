@@ -62,17 +62,27 @@ export default function Home() {
   const startCampaign = () => {
     if (selectedIds.length === 0) return;
     setCampaignIndex(0);
-    sendCurrentCampaignLead(0);
+    sendCurrentCampaignLead(0, true); // true = force new popup
   };
 
-  const sendCurrentCampaignLead = (index: number) => {
+  const sendCurrentCampaignLead = (index: number, isInitial: boolean = false) => {
     const selectedLeads = leads.filter((l: Lead) => selectedIds.includes(l.id));
     const lead = selectedLeads[index];
     if (!lead || !lead.phone) return;
 
     const text = campaignMessage.replace(/{EMPRESA}/g, lead.companyName);
     const cleanPhone = lead.phone.replace(/\D/g, '');
-    window.open(`https://web.whatsapp.com/send?phone=${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}&text=${encodeURIComponent(text)}`, '_blank');
+    const url = `https://web.whatsapp.com/send?phone=${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}&text=${encodeURIComponent(text)}`;
+    
+    // Configuração do Popup
+    const features = "width=800,height=900,status=no,resizable=yes,scrollbars=yes";
+    
+    if (isInitial) {
+      window.open(url, 'wa-campaign', features);
+    } else {
+      // Reutiliza a mesma janela chamada 'wa-campaign'
+      window.open(url, 'wa-campaign');
+    }
   };
 
   const nextCampaignLead = () => {

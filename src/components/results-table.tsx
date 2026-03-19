@@ -154,7 +154,7 @@ export function ResultsTable({ leads, onUpdateStatus, onEnrich, selectedIds, onT
                       </Button>
                     </div>
 
-                    {lead.website && !lead.phone && (
+                    {lead.website && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -164,13 +164,13 @@ export function ResultsTable({ leads, onUpdateStatus, onEnrich, selectedIds, onT
                           setEnrichingId(null);
                         }}
                         disabled={enrichingId === lead.id}
-                        className="border-violet-500/50 text-violet-400 hover:bg-violet-500/10 h-9 px-3 rounded-lg text-[10px] font-black uppercase tracking-tighter"
+                        className="group/ghost border-violet-500/50 text-violet-400 hover:bg-violet-500/20 hover:text-violet-300 h-9 px-3 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all"
                       >
                         {enrichingId === lead.id ? (
                           <div className="h-3 w-3 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
                         ) : (
                           <>
-                            <Zap className="h-3.5 w-3.5 mr-1" />
+                            <Zap className="h-3.5 w-3.5 mr-1 fill-violet-500/30 group-hover:animate-pulse" />
                             Ghost Scraper
                           </>
                         )}
