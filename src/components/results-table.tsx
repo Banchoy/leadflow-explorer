@@ -21,9 +21,13 @@ export function ResultsTable({ leads, onUpdateStatus, onEnrich, selectedIds, onT
   const handleWhatsApp = (phone: string, companyName?: string) => {
     const cleanPhone = phone.replace(/\D/g, '');
     if (!cleanPhone) return;
-    const message = encodeURIComponent("Olá! Vi seu perfil e gostaria de conversar sobre seus serviços.");
-    // Tenta abrir direto no Web se estiver no desktop, ou app se mobile
-    window.open(`https://web.whatsapp.com/send?phone=${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}&text=${message}`, '_blank');
+    const message = encodeURIComponent(`Olá ${companyName || ''}! Vi seu perfil no LeadFlow e gostaria de conversar sobre seus serviços.`);
+    const url = `https://web.whatsapp.com/send?phone=${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}&text=${message}`;
+    
+    // Popup Sniper Mode
+    const features = "width=800,height=900,status=no,resizable=yes,scrollbars=yes";
+    const waPopup = window.open(url, 'wa-vender', features);
+    if (waPopup) waPopup.focus();
   };
 
   return (
@@ -181,7 +185,7 @@ export function ResultsTable({ leads, onUpdateStatus, onEnrich, selectedIds, onT
                       size="sm"
                       onClick={() => {
                         onUpdateStatus(lead.id, 'Contatado');
-                        if (lead.phone) handleWhatsApp(lead.phone);
+                        if (lead.phone) handleWhatsApp(lead.phone, lead.companyName);
                       }}
                       className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold gap-2 shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all hover:scale-105 active:scale-95"
                     >
