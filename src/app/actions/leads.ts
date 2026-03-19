@@ -60,6 +60,28 @@ export interface Lead {
   priority?: "Alta" | "Média" | "Baixa";
 }
 
+async function discoverBestModel(apiKey: string) {
+  try {
+    const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey.trim()}`;
+    const res = await fetch(listUrl);
+    if (!res.ok) return "gemini-1.5-flash"; // Fallback padrão
+    const data = await res.json();
+    const models = data.models?.map((m: any) => m.name.split('/').pop()) || [];
+    console.log("[Gemini Discovery] Modelos disponíveis:", models.join(", "));
+    
+    // Ordem de preferência: 2.5-flash -> 2.0-flash -> 1.5-flash -> qualquer flash -> qualquer pro
+    if (models.includes("gemini-2.5-flash")) return "gemini-2.5-flash";
+    if (models.includes("gemini-2.0-flash")) return "gemini-2.0-flash";
+    const anyFlash = models.find((m: string) => m.includes("flash"));
+    if (anyFlash) return anyFlash;
+    const anyPro = models.find((m: string) => m.includes("pro"));
+    if (anyPro) return anyPro;
+    return models[0] || "gemini-1.5-flash";
+  } catch (e) {
+    return "gemini-1.5-flash";
+  }
+}
+
 export async function getLeadsBySearch(query: string, location: string, page: number = 0) {
   const apiKey = process.env.GOOGLE_AI_STUDIO_KEY || process.env.GOOGLE_PLACES_API_KEY;
   
@@ -101,21 +123,18 @@ export async function getLeadsBySearch(query: string, location: string, page: nu
     ${rawHtml.substring(0, 30000)}
   `;
 
-  try {
     const cleanKey = apiKey.trim();
-    const modelName = "gemini-2.5-flash"; // Fixado conforme solicitado
-    const apiVer = "v1beta"; 
+    const modelName = await discoverBestModel(cleanKey);
+    const apiVer = "v1beta";
 
     try {
       const geminiUrl = `https://generativelanguage.googleapis.com/${apiVer}/models/${modelName}:generateContent?key=${cleanKey}`;
-      console.log(`[Billionaire Shadow] Utilizando motor ${modelName} (Modo Solicitado)...`);
+      console.log(`[Billionaire Shadow] Motor selecionado automaticamente: ${modelName}`);
       
       const response = await fetch(geminiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          contents: [{ parts: [{ text: prompt }] }]
-        })
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
       });
 
       const data = await response.json();
